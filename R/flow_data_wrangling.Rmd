@@ -1,0 +1,324 @@
+---
+title: "Flow data pipeline"
+author: "Tuisku Tammi (adapted B.Cowley)"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '4'
+  # html_notebook:
+  #   code_folding: show
+  #   css: style.css
+  #   theme: yeti
+  #   toc: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
+---
+# Behavioral (CogCarSim) + FSS data
+
+### Importing data
+```{r setup}
+# attach packages
+library(here)
+library(RSQLite)
+library(data.table)
+library(magrittr)
+library(tidyverse)
+library(stringr)
+library(purrr)
+library(broom)
+library(jsonlite)
+library(DT)
+
+# set working directory, i.e. folder with data files
+knitr::opts_knit$set(root.dir = normalizePath(file.path(here(), 'data')))
+
+VRSN <- "2019"
+```
+
+```{r data import}
+# import the cogcarsim2 database
+sqlite.driver <- dbDriver("SQLite")
+connection <- dbConnect(sqlite.driver,
+                        dbname = paste0("cogcarsim2_", VRSN, ".db"))
+
+tables <- dbListTables(connection) #get tables named blob, run, step
+tbl_blob <- dbReadTable(connection, tables[1], row.names=NULL)
+tbl_run <- dbReadTable(connection, tables[2], row.names=NULL)
+tbl_step <- dbReadTable(connection, tables[3], row.names=NULL)
+
+dbDisconnect(connection)
+
+```
+
+```{r}
+head(tbl_blob)
+```
+
+```{r}
+head(tbl_run)
+```
+
+```{r}
+head(tbl_step)
+```
+
+```{r}
+#read Flow data
+fss <- fread(paste0("fss_data_", VRSN, ".csv"))
+
+head(fss) #Flow + importance items Q1-Q13, skill-demand items A1-A3 (not used here)
+```
+
+***
+
+### Wrangling
+
+<br>
+<br>
+CogCarSim
+
+```{r}
+# remove extra (test) runs;  make sure all unwanted runs are removed!
+tbl_run %<>% # note that the %<>% operator overwrites dataframe
+  filter(startsWith(participant, '0'))
+
+# filter other tables with updated runs
+tbl_blob %<>%
+  filter(run %in% tbl_run$run)
+
+tbl_step %<>%
+  filter(run %in% tbl_run$run)
+
+game_data <- tbl_run %>%
+  dplyr::select(-run) %>%
+  tidyr::extract(participant, c('participant', 'session', 'run'), # extract old participant variable into new participant, session, run variables
+                 "([[:alnum:]]+)-([[:alnum:]]+)-([[:alnum:]]+)") %>%
+  mutate_at(vars(session,run), as.numeric) %>%
+  add_row(participant = '08', # insert one participant's information that was missing due to a saving error
+          session = 6,
+          run = 1,
+          max_velocity = 3.286,
+          end_velocity = 3.286,
+          collisions = 9,
+          speed_drops = 7,
+          duration = 170.4783
+          ) %>% 
+  arrange(participant, session, run) %>% # arrange rows to create cumulative run variable
+  group_by(participant) %>%
+  mutate(cumrun = row_number(),
+         ln.duration = log(duration),
+         ln.cumrun = log(cumrun)) %>% 
+  ungroup # remember to ungroup!
+
+```
+
+```{r}
+head(game_data)
+```
+***
+<br>
+<br>
+Flow
+
+```{r}
+#make factors: fluency, absorption, flow, importance
+fluency_items <- c('Q2', 'Q4', 'Q5', 'Q7', 'Q8', 'Q9')
+abs_items <- c('Q1', 'Q3', 'Q6', 'Q10')
+flow_items <- c(fluency_items, abs_items)
+pi_items <- c('Q11', 'Q12', 'Q13')
+
+fss_items <- fss %>%
+  mutate(fluency = rowMeans(dplyr::select(., fluency_items)),
+         absorption = rowMeans(dplyr::select(., abs_items)),
+         flow = rowMeans(dplyr::select(., flow_items)),
+         pi_total = rowMeans(dplyr::select(., pi_items))) %>%
+  rename(pi1 = Q11,
+         pi2 = Q12,
+         pi3 = Q13) %>%
+  dplyr::select(participant:run, fluency, absorption, flow, pi1:pi3, pi_total) %>%
+  mutate(participant = paste0('0', as.character(participant))) # mutate participant variable into the right format (1 -> "01")
+
+```
+
+```{r}
+head(fss_items)
+```
+***
+<br>
+<br>
+Merge CogCarSim and Flow data
+
+```{r}
+fss_game <- game_data %>%
+  dplyr::select(participant:run, collisions, duration, ln.duration, distance, cumrun, ln.cumrun) %>%
+  left_join(fss_items, by = c('participant', 'session', 'run')) #if no vars given, it uses the ones with identical names
+```
+
+```{r}
+datatable(fss_game, filter='top', options = list(pageLength = 5, scrollX=T) )
+```
+
+<br>
+<br>
+Sanity check  
+```{r}
+summary(fss_game)
+```
+***
+### Extracting learning curve coefficients and predicted learning curves
+Fit a log-log regression curve for each participant separately: **log(duration) ~ log(cumulative run)** to get slope and intercept coefficients.  
+```{r}
+
+fss_learning <- fss_game %>%
+  group_by(participant) %>%
+  nest() %>% 
+    mutate(fit = map(data, ~lm(ln.duration ~ ln.cumrun, data = .)), # make models
+           coef = map(fit, tidy), # get coefficients
+           data_aug = map(fit, augment)) %>% # get predictions
+  unnest(coef) %>%
+  select(participant, term, estimate, data_aug) %>%
+  spread(term, estimate) %>%
+  rename(slope = ln.cumrun,
+         intercept = `(Intercept)`) %>%
+  unnest(data_aug) %>%
+  ungroup %>%
+  select(participant:.fitted, intercept, slope) %>%
+  rename(learning_curve = .fitted) %>%
+  left_join(fss_game, by = c('participant', 'ln.duration', 'ln.cumrun')) %>%
+  select(participant, session, run, everything()) 
+
+```
+
+```{r}
+head(fss_learning)
+```
+
+```{r fig.height=8, fig.width=12}
+fss_learning %>%
+  gather(var, value, learning_curve, ln.duration) %>%
+  ggplot(aes(cumrun, exp(value), shape=var, color=var)) + 
+  geom_point(alpha=.6, size=2) +
+  facet_wrap(~participant) +
+  theme_bw(base_size = 14) +
+  xlab('Cumulative runs') +
+  ylab('Trial duration (s)') +
+  scale_color_discrete(name = 'duration',
+                       breaks = c("learning_curve", "ln.duration"),
+                       labels = c("predicted", "observed")) +
+  scale_shape_discrete(name = 'duration',
+                       breaks = c("learning_curve", "ln.duration"),
+                       labels = c("predicted", "observed")) 
+
+
+
+```
+***
+
+<!-- # Physiological data -->
+
+<!-- ### Importing EDA raw data -->
+<!-- ```{r} -->
+<!-- files <- list.files('eda', pattern="0[[:alnum:]]+-[[:alnum:]]+-[[:alnum:]]+.json", recursive=TRUE, full.names=T) -->
+<!-- files -->
+<!-- ``` -->
+<!-- <br> -->
+<!-- <br> -->
+<!-- Reading json files and merging to one dataframe:   -->
+<!-- ```{r} -->
+<!-- read_eda <- function(file) { -->
+<!--   dataset <- jsonlite::stream_in(file(file)) # look for a faster way to do this! -->
+<!--     data_ts_eda <- dataset[, grep("ts[.]|E[.]", colnames(dataset))] %>% -->
+<!--       t() %>% -->
+<!--       as.data.frame() -->
+
+<!--     eda <- data_ts_eda[!is.na(data_ts_eda$`2`),2] # EDA signal -->
+<!--     ts <- data_ts_eda[!is.na(data_ts_eda$`1`),1] # timestamps -->
+<!--     ts_eda <- data.frame(ts, eda) -->
+<!--     ts_eda -->
+<!-- } -->
+
+<!-- eda_list <- sapply(files[1:5], read_eda, simplify = F, USE.NAMES = T) # apply function to files 1-5 -->
+
+<!-- eda_data <- do.call(rbind, eda_list) %>%  -->
+<!--   rownames_to_column() %>% -->
+<!--   group_by(rowname) %>% -->
+<!--   mutate(row = str_split(rowname, '/|\\.')[[1]][2]) %>%  -->
+<!--   ungroup %>%  -->
+<!--   tidyr::extract(row, c('participant', 'session', 'run'), -->
+<!--                  "([[:alnum:]]+)-([[:alnum:]]+)-([[:alnum:]]+)") %>% -->
+<!--   dplyr::select(-rowname) %>% -->
+<!--   arrange(participant, session, ts) %>% -->
+<!--   mutate(eda = 1000/eda) #convert to conductance -->
+
+<!-- ``` -->
+
+<!-- ```{r}  -->
+<!-- head(eda_data) -->
+<!-- ``` -->
+
+<!-- ```{r fig.width=10, fig.height=6} -->
+<!-- #plot signal -->
+<!-- eda_data %>% -->
+<!--   filter(participant == '01', session == '1', run == '1') %>% -->
+<!--   ggplot(aes(ts, eda)) + geom_line() + -->
+<!--   theme_bw() -->
+
+<!-- ``` -->
+<!-- *** -->
+
+<!-- <br> -->
+<!-- <br> -->
+<!-- Writing text files to be read in [Ledalab](http://www.ledalab.de/documentation.htm#batchmode) (here, one file per session): -->
+<!-- ```{r} -->
+<!-- write.tables  = function(DF) { -->
+<!--   write.table(DF[,1:2],paste0("eda/txt/eda_",unique(DF$participant),"-",unique(DF$session),".txt"), sep=",", row.names = F, col.names = F) -->
+<!--   return(DF) -->
+<!-- } -->
+
+<!-- eda_data %>%  -->
+<!--   group_by(participant, session) %>%  -->
+<!--   do(write.tables(.)) -->
+
+
+<!-- ``` -->
+<!-- *** -->
+<!-- <br> -->
+<!-- In Ledalab, downsample to 16 Hz, *check the signal*, and detect SCRs:   -->
+<!-- **Ledalab(path, 'open','leda','analyze','CDA','optimize',2,'export_scrlist',[.0001 2],'overview',1)**   -->
+<!-- <br> -->
+
+<!-- <style> -->
+<!-- div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;} -->
+<!-- </style> -->
+<!-- <div class = "blue"> -->
+<!-- ### Note: Syncing -->
+
+<!-- Game data and physiological data were gathered with different computers and have mismatching timestamps. We use eye-tracker videos to determine the time at which each game trial started, and extract timestamps from eye-tracker logs to sync the data.   -->
+
+<!-- Searching for frames in pupil:   -->
+
+<!-- 1. Go to file: Home → pupil →  pupil_src → player   -->
+<!-- 2. right click inside folder → “open in terminal”   -->
+<!-- 3. terminal opens, type “python3 main.py” (enter)   -->
+<!-- 4. grey Pupil player window opens → drag folder into window (e.g. 000)   -->
+<!-- 5. pause when “Press any button to start” text disappears    -->
+<!--     + when paused, you can move between frames with left/right arrow keys   -->
+<!--     + target frame is the first one where the text is not visible   -->
+<!--     + frame is the number next to the play/pause button   -->
+<!-- 6. write down run (e.g. 01-1-1), frame number and pupil file to excel sheet:   -->
+
+<!-- <center> -->
+<!-- ![](sheet.png)   -->
+<!-- </center> -->
+
+<!-- <br> -->
+<!-- With this file, pupil unix timestamps can be read for each trial from **world_timestamps_unix.npy** files (using a python script). These timestamps match EDA timestamps and can be used to determine the start of each trial.   -->
+
+<!-- </div> -->
+
+<!-- ```{r} -->
+<!-- sessionInfo() -->
+<!-- ``` -->
+
