@@ -1,6 +1,6 @@
 ---
 title: "Flow data pipeline"
-author: "Tuisku Tammi (adapted B.Cowley)"
+author: "Tuisku Tammi"
 output:
   html_document:
     df_print: paged
@@ -32,7 +32,7 @@ library(jsonlite)
 library(DT)
 
 # set working directory, i.e. folder with data files
-knitr::opts_knit$set(root.dir = normalizePath(file.path(here(), 'data')))
+knitr::opts_knit$set(root.dir = normalizePath(file.path(here(), '..', 'data')))
 
 VRSN <- "2019"
 ```

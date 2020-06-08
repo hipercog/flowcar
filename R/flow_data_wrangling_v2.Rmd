@@ -34,7 +34,7 @@ library(viridis)
 library(here)
 
 # set working directory, i.e. folder with data files
-knitr::opts_knit$set(root.dir = normalizePath(file.path(here(), 'data')))
+knitr::opts_knit$set(root.dir = normalizePath(file.path(here(), '..', 'data')))
 
 VRSN <- "2019"
 ```
