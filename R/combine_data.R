@@ -1,32 +1,21 @@
 # ---
 # title: "Flow data pipeline"
-# author: "Ben Cowley"
+# author: "Ben Cowley (from T.Tammi)"
 # ---
 # attach packages
-library(RSQLite)
-library(data.table)
 library(magrittr)
 library(tidyverse)
+library(data.table)
 library(stringr)
 library(purrr)
 library(broom)
 library(jsonlite)
 library(DT)
-library(lme4)
-library(viridis)
 library(here)
-library(gghalves)
-
 
 source(file.path(here(), 'R', 'utils.R'))
 # set folder with data files
 indir <- file.path(here(), '..', 'data')
-# create an output dir for figures
-FIGOUT <- FALSE
-if (FIGOUT){
-  odir <- file.path(here(), 'figures')
-  dir.create(odir, showWarnings = FALSE)
-}
 # Also do something with blobs and steps (large tables)
 BIGDATA <- FALSE
 if (BIGDATA){
@@ -36,7 +25,7 @@ if (BIGDATA){
 }
 
 
-### Behavioral (CogCarSim) + FSS data ----
+### Behavioral (CogCarSim) data ----
 # import the cogcarsim2 databases
 tb17 <- readCCSdb(file.path(indir, "cogcarsim2_2017.db"), t, 17)
 tb19 <- readCCSdb(file.path(indir, "cogcarsim2_2019.db"), t, 19)
@@ -61,18 +50,19 @@ if (BIGDATA){
   tbl_step %<>%
     filter(run %in% tbl_runs$run)
   
-  rm(tb17, tb19)
 }
+rm(tb17, tb19)
 
 
-# assign table to modify data
+# clean up / modify behavioural data
 game_data <- tbl_runs %>%
   dplyr::select(-run) %>%
   # extract old participant variable into new participant, session, run variables
   tidyr::extract(participant, c('participant', 'session', 'run'),
                  "([[:alnum:]]+)-([[:alnum:]]+)-([[:alnum:]]+)") %>%
   mutate_at(vars(participant,session,run), as.numeric) %>%
-  mutate(tbl_runs$provenance == 19, participant = participant + ((provenance - 17) * 4.5)) %>%
+  # this is a pure hack to change 2019 participant numbers to be 10:18
+  mutate(participant = participant + ((provenance - 17) * 4.5)) %>%
   # arrange rows to create cumulative run variable
   arrange(participant, session, run) %>%
   # mutate participant variable into the right format (1 -> "01")
@@ -115,28 +105,7 @@ fss_items <- fss %>%
   # mutate participant variable into the right format (1 -> "01")
   mutate(participant = formatC(participant, width = 2, format = "d", flag = "0"))
 
-  # group_by(participant) %>%
-  # mutate(mean_flow = mean(fss_items$flow)) %>%
-  # ungroup() %>%
-  # arrange(mean_flow)
-
 head(fss_items)
-
-
-# Basic violin plot
-fss_items %>%
-  mutate(participant = fct_reorder(participant, desc(flow), .fun='median')) %>%
-  ggplot( aes(x=participant, y=flow)) + 
-  geom_half_violin(trim=FALSE, fill="gray", side = "r") +
-  geom_boxplot(width=0.1, outlier.shape = NA) +
-  geom_hline(yintercept = median(fss_items$flow), color = "red") +
-  geom_text(aes(length(unique(fss_items$participant)), median(fss_items$flow), label = "med.\nFlow", vjust = -1)) +
-  labs(title="Flow scores per participant", x="Participant", y = "Flow") +
-  ylim(2, 7) +
-  theme_classic()
-if (FIGOUT)
-  ggsave(file.path(odir, "FlowXsubj.svg"))
-
 
 
 # join game data and fss data into a single dataframe
@@ -144,15 +113,12 @@ fss_game <- game_data %>%
   dplyr::select(participant:run, collisions, duration, ln.duration, distance, cumrun, ln.cumrun) %>%
   left_join(fss_items, by = c('participant', 'session', 'run')) # if no vars given, use the ones with identical names
 
-# display the datatable created just before
-# datatable(fss_game, filter='top', options = list(pageLength = 5, scrollX=T) )
-
 # see if everything is as it should be (e.g. no leftover rows of data, sane amount of sessions etc.)
 summary(fss_game)
 
 
 
-### Extracting learning curve coefficients and predicted learning curves
+### Extracting learning curve coefficients and predicted learning curves ----
 # Fit a log-log regression curve for each participant separately: 
 #     log(duration) ~ log(cumulative run)
 # to get slope and intercept coefficients
@@ -175,69 +141,14 @@ fss_learning <- fss_game %>%
   select(participant:.fitted, intercept, slope) %>%
   rename(learning_curve = .fitted) %>%
   left_join(fss_game, by = c('participant', 'ln.duration', 'ln.cumrun')) %>%
-  select(participant, session, run, everything()) 
-
-
-
+  select(participant, session, run, everything()) %>%
+  # acquire  deviation from predicted curve
+  mutate(deviation = ln.duration - learning_curve) %>%
+  group_by(participant) %>%
+  # acquire flow z-scores
+  mutate(z.flow = ((flow-mean(flow)) / sd(flow))) %>%
+  ungroup()
 
 # spit out newly created data
 head(fss_learning)
-
-# plot linear performance
-ggplot(fss_learning, aes(cumrun, duration)) +
-  geom_point(alpha=.6, size=2) +
-  geom_smooth(method = "lm", se = FALSE, linetype = 1, size = 0.5, color="red") +
-  facet_wrap(~participant) +
-  theme_bw(base_size = 14)
-if (FIGOUT)
-  ggsave(file.path(odir, "PerfXsubj.svg"))
-
-# plot linear performance with power law fit
-ggplot(fss_learning, aes(cumrun, duration)) +
-  geom_point(alpha=.6, size=2) +
-  stat_smooth(method = 'nls', formula = 'y~a*x^b', size = 0.5, se=FALSE, color ="red") +
-  facet_wrap(~participant) +
-  theme_bw(base_size = 14)
-if (FIGOUT)  ggsave(file.path(odir, "PerfXsubj_powerlaw.svg"))
-
-# acquire flow z-scores
-fss_learning %<>% group_by(participant) %>% 
-  mutate(z.flow = ((flow-mean(flow)) / sd(flow)))
-
-# plot linear performance with power law fit and flow z-scores coloring
-ggplot(fss_learning, aes(cumrun, duration, color = z.flow)) +
-  geom_point(alpha=.6, size=2) +
-  stat_smooth(method = 'nls', formula = 'y~a*x^b', size = 0.5, se=FALSE, color ="red") +
-  facet_wrap(~participant) +
-  scale_color_viridis() +
-  theme_bw(base_size = 14)
-if (FIGOUT)
-  ggsave(file.path(odir, "PerfXsubj_powlxFlow.svg"))
-
-# plot log-log with flow z-scores coloring
-ggplot(fss_learning, aes(ln.cumrun, ln.duration, color = z.flow)) +
-  geom_point(alpha=.6, size=2) +
-  geom_smooth(method = "lm", se = FALSE, linetype = 1, size = 0.5, color="red") +
-  facet_wrap(~participant) +
-  scale_color_viridis() +
-  theme_bw(base_size = 14)
-if (FIGOUT)
-  ggsave(file.path(odir, "PerfXsubj_powlxFlow_loglog.svg"))
-
-# plot deviation from predicted curve
-fss_learning <- mutate(fss_learning, deviation = ln.duration - learning_curve)
-ggplot(fss_learning, aes(deviation, flow)) +
-  geom_point(alpha=.6, size=2) +
-  geom_smooth(method = "lm", se = FALSE) + 
-  facet_wrap(~participant) +
-  theme_bw(base_size = 14)
-if (FIGOUT)
-  ggsave(file.path(odir, "FlowXdevXsubj.svg"))
-
-# statistical test (linear mixed model)
-fss_learning_lmer <- lmer(flow ~ deviation + (deviation|participant), data=fss_learning)
-summary(fss_learning_lmer) # model summary
-plot(fss_learning_lmer) # model diagnostics
-qqnorm(residuals(fss_learning_lmer)) #qq-plot
-qqline(residuals(fss_learning_lmer)) #line of "perfect normality"
 
