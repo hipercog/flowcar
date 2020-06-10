@@ -52,16 +52,16 @@ connection <- dbConnect(sqlite.driver,
 
 # get tables named blob, run, step
 tables <- dbListTables(connection)
-tbl_blob <- dbReadTable(connection, tables[1], row.names=NULL)
+# tbl_blob <- dbReadTable(connection, tables[1], row.names=NULL)
 tbl_run <- dbReadTable(connection, tables[2], row.names=NULL)
-tbl_step <- dbReadTable(connection, tables[3], row.names=NULL)
+# tbl_step <- dbReadTable(connection, tables[3], row.names=NULL)
 
 dbDisconnect(connection)
 
 ```
 
 ```{r}
-head(tbl_blob)
+# head(tbl_blob)
 ```
 
 ```{r}
@@ -69,7 +69,7 @@ head(tbl_run)
 ```
 
 ```{r}
-head(tbl_step)
+# head(tbl_step)
 ```
 
 ```{r}
@@ -92,12 +92,12 @@ CogCarSim
 tbl_run %<>% # %<>% operator overwrites dataframe
   filter(startsWith(participant, '0'))
 
-# filter other tables with updated runs
-tbl_blob %<>%
-  filter(run %in% tbl_run$run)
-
-tbl_step %<>%
-  filter(run %in% tbl_run$run)
+# # filter other tables with updated runs
+# tbl_blob %<>%
+#   filter(run %in% tbl_run$run)
+# 
+# tbl_step %<>%
+#   filter(run %in% tbl_run$run)
 
 # assign table to modify data
 game_data <- tbl_run %>%

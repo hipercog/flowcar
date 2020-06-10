@@ -1,0 +1,7 @@
+pi1 = Something important to me is at stake here
+pi2 = I must not make any mistakes here
+pi3 = I am worried about failing
+
+ski = I think that my competence in this area is...(LOW - HIGH)
+dem = Compared to all other activities which I partake in, this one is...(easy - difficult)
+fit = For me personally, the current demands are... (too low/just right/too high)

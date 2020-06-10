@@ -26,6 +26,11 @@ if (BIGDATA){
 }
 
 
+### BACKRGOUND DATA ----
+# TODO - COLLATE COMPLETE BACKGROUND DATASET AND SAVE IN DATA FOLDER
+bkgd <- read.csv(file.path(indir, "background_info.csv"))
+
+
 ### Behavioral (CogCarSim) data ----
 # import the cogcarsim2 databases
 tb17 <- readCCSdb(file.path(indir, "cogcarsim2_2017.db"), t, 17)

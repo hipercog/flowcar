@@ -11,6 +11,7 @@ library(gghalves)
 library(tidyverse)
 
 source(file.path(here(), 'R', 'utils.R'))
+source(file.path(here(), 'R', 'znbnUtils.R'))
 # create an output dir for figures
 FIGOUT <- FALSE
 if (FIGOUT){
@@ -92,10 +93,13 @@ qqline(residuals(fss_learning_lmer)) #line of "perfect normality"
 # to area where the “adjusted p-values” (here adjusted taking the multiplicity correction due to 
 # autocorrelation structure into account) are at least 0.05. The width of the naive quantile 
 # typically provides a lower bound for the width of the respective MWE.
+
+# First, make data wide by cumruns on duration
 dat <- game_data %>%
   select(participant, cumrun, duration) %>%
   pivot_wider(names_from = cumrun, values_from = duration) %>%
   select(-participant)
+# index NAs - MWE cannot handle these
 idx <- which(apply(dat,2,function(x) all(!is.na(x))))
 
 # Commented here is canonical example for finding curves of multiple datasets, e.g. subgroups
@@ -113,3 +117,7 @@ plot(c(idx[1],idx[length(idx)]), rng
      , type="n", bty="n", xlab="cumrun", ylab="ms", main = "Group performance 95% CB")
 plotlines_comp(curve17, idx, col="red")
 plotlines_comp(curve19, idx, col="blue")
+
+
+### SOME BASIC GROWTH CURVE ANALYSIS ----
+# TODO - BEN WILL ADD SOME SIMPLE DEMO CODE HERE ASAP
