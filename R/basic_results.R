@@ -8,6 +8,7 @@ library(lme4)
 library(viridis)
 library(here)
 library(gghalves)
+library(tidyverse)
 
 source(file.path(here(), 'R', 'utils.R'))
 # create an output dir for figures
@@ -19,7 +20,7 @@ if (FIGOUT){
 
 # Basic violin plot
 fss_items %>%
-  mutate(participant = fct_reorder(participant, desc(flow), .fun='median')) %>%
+  mutate(participant = fct_reorder(participant, desc(flow), .fun='var')) %>%
   ggplot( aes(x=participant, y=flow)) + 
   geom_half_violin(trim=FALSE, fill="gray", side = "r") +
   geom_boxplot(width=0.1, outlier.shape = NA) +
@@ -71,8 +72,7 @@ ggplot(fss_learning, aes(deviation, flow)) +
   geom_smooth(method = "lm", se = FALSE) + 
   facet_wrap(~participant) +
   theme_bw(base_size = 14)
-if (FIGOUT)
-  ggsave(file.path(odir, "FlowXdevXsubj.svg"))
+if (FIGOUT)  ggsave(file.path(odir, "FlowXdevXsubj.svg"))
 
 
 ### statistical test (linear mixed model) ----
@@ -84,13 +84,19 @@ qqline(residuals(fss_learning_lmer)) #line of "perfect normality"
 
 
 
-### exploration with MWE confidence bands ----
+### exploration with MWE confidence bands as documented in Korpela et al. (2014) ----
+# Plots of all signals with mean sample means (thick solid line), their 95% MWEs (dashed lines), 
+# and naive 95% quantiles (dotted thin lines) are shown below. The naive quantiles are computed per 
+# time instance, without taking other time instances into account. In a way, a naive quantile 
+# corresponds to an area where the “unadjusted p-values” are at least 0.05, while the MWE correspond 
+# to area where the “adjusted p-values” (here adjusted taking the multiplicity correction due to 
+# autocorrelation structure into account) are at least 0.05. The width of the naive quantile 
+# typically provides a lower bound for the width of the respective MWE.
 dat <- game_data %>%
   select(participant, cumrun, duration) %>%
   pivot_wider(names_from = cumrun, values_from = duration) %>%
   select(-participant)
 idx <- which(apply(dat,2,function(x) all(!is.na(x))))
-# list(data=t(as.matrix(data[,idx])),idx=idx)
 
 # Commented here is canonical example for finding curves of multiple datasets, e.g. subgroups
 # curves <- lapply(data, function(x) findcurves(x))

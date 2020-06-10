@@ -15,6 +15,7 @@ library(here)
 
 source(file.path(here(), 'R', 'utils.R'))
 # set folder with data files
+# 
 indir <- file.path(here(), '..', 'data')
 # Also do something with blobs and steps (large tables)
 BIGDATA <- FALSE
