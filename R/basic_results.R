@@ -127,6 +127,9 @@ plotlines_comp(curve19, idx, col="blue")
 ### SOME BASIC GROWTH CURVE ANALYSIS ----
 # All this is doing is testing a series of LMEs on the effect of cumrun on duration. Not
 # very exciting. But it is an example of growth curve modelling, for whatever that's worth.
+# NB: non-linear factors can be added as (or whatever model you want): 
+#   duration + I(duration^2) 
+#   duration + I(log(duration))
 df.growth <- fss_game %>% select(1:9)
 # ---- UNCONDITIONAL MEANS MODEL - BASE COMPARISON MODEL ----
 um.fit <- lme(fixed = duration ~ 1, 
