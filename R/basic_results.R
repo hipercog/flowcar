@@ -9,6 +9,7 @@ library(viridis)
 library(here)
 library(gghalves)
 library(tidyverse)
+library(nlme) #for 'growth-curve' models
 
 source(file.path(here(), 'R', 'utils.R'))
 source(file.path(here(), 'R', 'znbnUtils.R'))
@@ -119,5 +120,138 @@ plotlines_comp(curve17, idx, col="red")
 plotlines_comp(curve19, idx, col="blue")
 
 
+
+
+
+
 ### SOME BASIC GROWTH CURVE ANALYSIS ----
-# TODO - BEN WILL ADD SOME SIMPLE DEMO CODE HERE ASAP
+# All this is doing is testing a series of LMEs on the effect of cumrun on duration. Not
+# very exciting. But it is an example of growth curve modelling, for whatever that's worth.
+# NB: non-linear factors can be added as (or whatever model you want): 
+#   duration + I(duration^2) 
+#   duration + I(log(duration))
+df.growth <- fss_game %>% select(1:9)
+# ---- UNCONDITIONAL MEANS MODEL - BASE COMPARISON MODEL ----
+um.fit <- lme(fixed = duration ~ 1, 
+              random = ~ 1|participant, 
+              data = df.growth,
+              na.action = na.exclude)
+summary(um.fit)
+VarCorr(um.fit)
+RandomEffects <- as.numeric(VarCorr(um.fit)[,1])
+ICC_between <- RandomEffects[1]/(RandomEffects[1]+RandomEffects[2]) # between-person variance
+# within-person variance = 100 - (ICC_between * 100)
+df.growth$pred.um <- predict(um.fit)
+df.growth$resid.um <- residuals(um.fit)
+#plotting PREDICTED intraindividual change; overlay PROTOTYPE (average individual)
+#create the function for the prototype
+fun.um <- function(x) {
+  as.numeric(um.fit$coefficients$fixed) + 0*x
+}
+#add the prototype as an additional layer
+ggplot(data = df.growth, aes(x = cumrun, y = pred.um, group = participant)) +
+  ggtitle("Unconditional Means Model") +
+  #  geom_point() + 
+  geom_line() +
+  xlab("cumrun") + 
+  ylab("PREDICTED duration") + #ylim(0,50) +
+  stat_function(fun=fun.um, color="red", size = 2)
+#plotting RESIDUAL intraindividual change
+ggplot(data = df.growth, aes(x = cumrun, y = resid.um, group = participant)) +
+  ggtitle("Unconditional Means Model") +
+  #  geom_point() + 
+  geom_line() +
+  xlab("cumrun") + 
+  ylab("RESIDUAL duration")
+
+# ---- FIXED LINEAR RANDOM INTERCEPT GROWTH MODEL (SESSION AS TIME)
+fl.ri.fit <- lme(fixed = duration ~ 1 + cumrun, 
+                 random = ~ 1|participant, 
+                 data = df.growth,
+                 na.action = na.exclude)
+summary(fl.ri.fit)
+#Place individual predictions and residuals into the dataframe
+df.growth$pred.fl.ri <- predict(fl.ri.fit)
+df.growth$resid.fl.ri <- residuals(fl.ri.fit)
+#Create a function for the prototype
+fun.fl.ri <- function(x) {
+  as.numeric(fl.ri.fit$coefficients$fixed[1]) + as.numeric(fl.ri.fit$coefficients$fixed[2])*x
+}
+#plotting PREDICTED intraindividual change
+ggplot(data = df.growth, aes(x = cumrun, y = pred.fl.ri, group = participant)) +
+  ggtitle("Fixed Linear, Random Intercept") +
+  #  geom_point() + 
+  geom_line() +
+  xlab("cumrun") + 
+  ylab("PREDICTED duration") + 
+  stat_function(fun=fun.fl.ri, color="red", size = 2)
+#plotting RESIDUAL intraindividual change
+ggplot(data = df.growth, aes(x = cumrun, y = resid.fl.ri, group = participant)) +
+  ggtitle("Fixed Linear, Random Intercept") +
+  #  geom_point() + 
+  geom_line() +
+  xlab("cumrun") + 
+  ylab("RESIDUAL duration")
+
+# ---- RANDOM LINEAR FIXED INTERCEPT GROWTH MODEL (SESSION AS TIME)
+ctrl <- lmeControl(opt='optim')
+rl.fi.fit <- lme(fixed = duration ~ 1,
+                 random = ~ 1 + cumrun|participant,
+                 data = df.growth,
+                 na.action = na.exclude,
+                 control = ctrl)
+summary(rl.fi.fit)
+#Place individual predictions and residuals into the dataframe
+df.growth$pred.rl.fi <- predict(rl.fi.fit)
+df.growth$resid.rl.fi <- residuals(rl.fi.fit)
+#Create a function for the prototype
+fun.rl.fi <- function(x) {
+  as.numeric(rl.fi.fit$coefficients$fixed[1]) + 0*x
+}
+#plotting PREDICTED intraindividual change
+ggplot(data = df.growth, aes(x = cumrun, y = pred.rl.fi, group = participant)) +
+  ggtitle("Random Linear, Fixed Intercept") +
+  geom_line() +
+  xlab("cumrun") +
+  ylab("PREDICTED duration") +
+  stat_function(fun=fun.rl.fi, color="red", size = 2)
+#plotting RESIDUAL intraindividual change
+ggplot(data = df.growth, aes(x = cumrun, y = resid.rl.fi, group = participant)) +
+  ggtitle("Random Linear, Fixed Intercept") +
+  geom_line() +
+  xlab("cumrun") +
+  ylab("RESIDUAL duration")
+
+# ---- RANDOM LINEAR SLOPES AND INTERCEPTS ----
+rl.ri.fit <- lme(fixed = duration ~ 1 + cumrun,
+                 random = ~ 1 + cumrun|participant,
+                 data = df.growth,
+                 na.action = na.exclude,
+                 control = ctrl)
+summary(rl.ri.fit)
+intervals(rl.ri.fit)
+#Place individual predictions and residuals into the dataframe
+df.growth$pred.rl.ri <- predict(rl.ri.fit)
+df.growth$resid.rl.ri <- residuals(rl.ri.fit)
+#Create a function for the prototype
+fun.rl.ri <- function(x) {
+  as.numeric(rl.ri.fit$coefficients$fixed[1]) + as.numeric(rl.ri.fit$coefficients$fixed[2])*x
+}
+#plotting PREDICTED intraindividual change
+ggplot(data = df.growth, aes(x = cumrun, y = pred.rl.ri, group = participant)) +
+  ggtitle("Random Linear, Random Intercept") +
+  #  geom_point() + 
+  geom_line() +
+  xlab("cumrun") + 
+  ylab("PREDICTED duration") +
+  stat_function(fun=fun.rl.ri, color="red", size = 2)
+#plotting RESIDUAL intraindividual change
+ggplot(data = df.growth, aes(x = cumrun, y = resid.rl.ri, group = participant)) +
+  ggtitle("Random Linear, Random Intercept") +
+  #  geom_point() + 
+  geom_line() +
+  xlab("cumrun") + 
+  ylab("RESIDUAL duration")
+# significance of random slopes: compare models by anova() for difference in fit between two nested models
+anova(um.fit,fl.ri.fit)
+anova(fl.ri.fit,rl.ri.fit)
