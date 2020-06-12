@@ -15,16 +15,12 @@ library(lattice)
 library(robustlmm)
 library(grid)
 
-#Create integer variable for participants (ID)
-fss_learning <- fss_learning %>% mutate(ID=as.integer(participant))
-fss_learning$ID <- as.factor(fss_learning$ID)
-
-#RQ: Does the effect of Deviation on Flow (main finding from previous paper) depend on level cumrun (how many runs the participant has played)
-
 #Remove first row (cumrun == 1) for each participant. NOT USED IN THE INTERACTION ANALYSIS.
 fss_learning_sub <- subset(fss_learning, cumrun!=1)
 anova(lmer(flow ~ deviation + (deviation|participant), data=fss_learning_sub))
 anova(lmer(flow ~ deviation + (deviation|participant), data=fss_learning))
+
+#RQ2: Does the effect of Deviation on Flow (main finding from previous paper) depend on level cumrun (how many runs the participant has played)
 
 #Fit model (note: could also try random slope/intercept for deviation*cumrun):
 fss_learning2_lmer <- lmer(flow ~ deviation*cumrun + (deviation|participant), data=fss_learning)

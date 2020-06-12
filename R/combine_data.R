@@ -27,8 +27,12 @@ if (BIGDATA){
 
 
 ### BACKRGOUND DATA ----
-# TODO - COLLATE COMPLETE BACKGROUND DATASET AND SAVE IN DATA FOLDER
-bkgd <- read.csv(file.path(indir, "background_info.csv"))
+# TODO - TRANSLATE BACKGROUND DATASETS IN DATA FOLDER INTO ENGLISH, REMOVE EXCESS FIELDS
+# bkgd <-
+#   read.csv(file.path(indir, "background_2019.csv")) %>%
+#   mutate(ID = ID + 9) %>%
+#   rbind(read.csv(file.path(indir, "background_2017.csv")), .)
+# head(bkgd)
 
 
 ### Behavioral (CogCarSim) data ----
@@ -71,6 +75,8 @@ game_data <- tbl_runs %>%
   mutate(participant = participant + ((provenance - 17) * 4.5)) %>%
   # arrange rows to create cumulative run variable
   arrange(participant, session, run) %>%
+  # create ID = integer factor for participants
+  mutate(ID = as.factor(as.integer(participant))) %>%
   # mutate participant variable into the right format (1 -> "01")
   mutate(participant = formatC(participant, width = 2, format = "d", flag = "0")) %>%
   group_by(participant) %>%
@@ -110,6 +116,8 @@ fss_items <- fss %>%
          pi2 = Q12,
          pi3 = Q13) %>%
   dplyr::select(participant:run, fluency, absorption, flow, pi1:pi3, pi_total) %>%
+  # create ID = integer factor for participants
+  mutate(ID = as.factor(as.integer(participant))) %>%
   # mutate participant variable into the right format (1 -> "01")
   mutate(participant = formatC(participant, width = 2, format = "d", flag = "0"))
 
@@ -118,8 +126,8 @@ head(fss_items)
 
 # join game data and fss data into a single dataframe
 fss_game <- game_data %>%
-  dplyr::select(participant:run, collisions, duration, ln.duration, distance, cumrun, ln.cumrun) %>%
-  left_join(fss_items, by = c('participant', 'session', 'run')) # if no vars given, use the ones with identical names
+  dplyr::select(participant:run, ID, collisions, duration, ln.duration, distance, cumrun, ln.cumrun) %>%
+  left_join(fss_items, by = c('participant', 'session', 'run', 'ID')) # if no vars given, use the ones with identical names
 
 # see if everything is as it should be (e.g. no leftover rows of data, sane amount of sessions etc.)
 summary(fss_game)

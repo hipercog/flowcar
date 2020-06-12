@@ -1,0 +1,49 @@
+---
+  title: "Flow data pipeline"
+author: "B.Cowley + J.Firehill"
+output: 
+  html_document:
+  df_print: paged
+toc: yes
+toc_depth: '4'
+# html_notebook:
+#   code_folding: show
+#   css: style.css
+#   theme: yeti
+#   toc: yes
+pdf_document:
+  toc: yes
+toc_depth: '4'
+
+---
+  # Behavioral (CogCarSim) + FSS data
+  
+  ### Importing data
+```{r setup}
+# attach packages
+library(tidyverse)
+library(here)
+
+# set working directory, i.e. folder with data files
+knitr::opts_knit$set(root.dir = normalizePath(file.path(here(), '..', 'data')))
+
+# create output folder?
+odir <- file.path(here(), 'figures')
+dir.create(odir, showWarnings = FALSE)
+```
+
+```{r data import}
+
+```
+
+```{r RQ1 - replication}
+
+```
+
+```{r RQ2 - exploration}
+
+```
+
+```{r RQ3 - validation}
+
+```

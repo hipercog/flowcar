@@ -14,7 +14,7 @@ library(nlme) #for 'growth-curve' models
 source(file.path(here(), 'R', 'utils.R'))
 source(file.path(here(), 'R', 'znbnUtils.R'))
 # create an output dir for figures
-FIGOUT <- FALSE
+FIGOUT <- TRUE
 if (FIGOUT){
   odir <- file.path(here(), 'figures')
   dir.create(odir, showWarnings = FALSE)
@@ -31,6 +31,18 @@ fss_items %>%
   labs(title="Flow scores per participant", x="Participant", y = "Flow") +
   ylim(2, 7) +
   theme_classic()
+
+fss_items %>%
+  mutate(participant = fct_reorder(participant, desc(absorption), .fun='var')) %>%
+  ggplot( aes(x=participant, y=absorption)) + 
+  # geom_half_violin(trim=FALSE, fill="gray", side = "r") +
+  geom_boxplot(width=0.3, outlier.shape = NA, notch = TRUE) +
+  geom_hline(yintercept = median(fss_items$absorption), color = "red") +
+  geom_text(aes(length(unique(fss_items$participant)), median(fss_items$absorption), label = "med.\nabsorption", vjust = -1)) +
+  labs(title="absorption scores per participant", x="Participant", y = "absorption") +
+  ylim(2, 7) +
+  theme_classic()
+
 if (FIGOUT) ggsave(file.path(odir, "FlowXsubj.svg"))
 
 # plot linear performance
@@ -78,12 +90,28 @@ if (FIGOUT)  ggsave(file.path(odir, "FlowXdevXsubj.svg"))
 
 
 ### statistical test (linear mixed model) ----
-fss_learning_lmer <- lmer(flow ~ deviation + (deviation|participant), data=fss_learning)
-summary(fss_learning_lmer) # model summary
-plot(fss_learning_lmer) # model diagnostics
-qqnorm(residuals(fss_learning_lmer)) #qq-plot
-qqline(residuals(fss_learning_lmer)) #line of "perfect normality"
+# RQ1 - main replication: does the new dataset replicate the old one?
+flow_dev_lmer17 <- lmer(flow ~ deviation + (deviation|participant), 
+                      data=filter(fss_learning, as.numeric(ID) < 10))
+plot(flow_dev_lmer17) # model diagnostics
+qqnorm(residuals(flow_dev_lmer17)) #qq-plot
+qqline(residuals(flow_dev_lmer17)) #line of "perfect normality"
 
+flow_dev_lmer19 <- lmer(flow ~ deviation + (deviation|participant), 
+                        data=filter(fss_learning, as.numeric(ID) > 9))
+plot(flow_dev_lmer19) # model diagnostics
+qqnorm(residuals(flow_dev_lmer19)) #qq-plot
+qqline(residuals(flow_dev_lmer19)) #line of "perfect normality"
+
+anova(flow_dev_lmer17)
+anova(flow_dev_lmer19)
+
+flow_dev_lmer <- lmer(flow ~ deviation + (deviation|participant), data=fss_learning)
+anova(flow_dev_lmer)
+summary(flow_dev_lmer) # model summary
+plot(flow_dev_lmer) # model diagnostics
+qqnorm(residuals(flow_dev_lmer)) #qq-plot
+qqline(residuals(flow_dev_lmer)) #line of "perfect normality"
 
 
 ### exploration with MWE confidence bands as documented in Korpela et al. (2014) ----
