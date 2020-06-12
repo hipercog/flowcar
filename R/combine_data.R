@@ -96,6 +96,8 @@ fluency_items <- c('Q2', 'Q4', 'Q5', 'Q7', 'Q8', 'Q9')
 abs_items <- c('Q1', 'Q3', 'Q6', 'Q10')
 flow_items <- c(fluency_items, abs_items)
 pi_items <- c('Q11', 'Q12', 'Q13')
+#pi_items <- c('Q11', 'Q12')
+
 
 # compute flow factors per run
 fss_items <- fss %>%
