@@ -1,35 +1,60 @@
-#Preliminary flow data analyses (c) Jussi Palomäki
+---
+title: "Preliminary data analyses"
+author: "Jussi Palomäki"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '4'
+  # html_notebook:
+  #   code_folding: show
+  #   css: style.css
+  #   theme: yeti
+  #   toc: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
+---
 
-#Load libraries
-library(ggplot2)
-library(colorRamps)  
-library(grDevices)
-library(lme4)
-library(effects)
-library(multcomp)
-library(tidyverse)
-library(lmerTest)
-library(ggpubr)
-library(MuMIn)
-library(lattice)
-library(robustlmm)
-library(grid)
+```{r error=TRUE}
+
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(colorRamps))
+suppressPackageStartupMessages(library(grDevices))
+suppressPackageStartupMessages(library(lme4))
+suppressPackageStartupMessages(library(effects))
+suppressPackageStartupMessages(library(multcomp))
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(lmerTest))
+suppressPackageStartupMessages(library(ggpubr))
+suppressPackageStartupMessages(library(MuMIn))
+suppressPackageStartupMessages(library(lattice))
+suppressPackageStartupMessages(library(robustlmm))
+suppressPackageStartupMessages(library(sjPlot))
+suppressPackageStartupMessages(library(grid))
+suppressPackageStartupMessages(library(here))
+
+# load data
+indir <- file.path(here(), '..', 'data')
+fss_learning <- read.csv(file.path(indir, "fss_learning.csv"))
 
 #Create integer variable for participants (ID)
 fss_learning <- fss_learning %>% mutate(ID=as.integer(participant))
 fss_learning$ID <- as.factor(fss_learning$ID)
 
-#RQ: Does the effect of Deviation on Flow (main finding from previous paper) depend on level cumrun (how many runs the participant has played)
-
-#Remove first row (cumrun == 1) for each participant. NOT USED IN THE INTERACTION ANALYSIS.
+#Remove first row (cumrun == 1) for each participant. There can be no expectation of performance based on previous performance when participants play their first run.
 fss_learning_sub <- subset(fss_learning, cumrun!=1)
+
+#Fit models with both the first run removed and with all runs. Models are almost equal, with the one where first run is removed being slightly better
 anova(lmer(flow ~ deviation + (deviation|participant), data=fss_learning_sub))
 anova(lmer(flow ~ deviation + (deviation|participant), data=fss_learning))
 
-#Fit model (note: could also try random slope/intercept for deviation*cumrun):
-fss_learning2_lmer <- lmer(flow ~ deviation*cumrun + (deviation|participant), data=fss_learning)
+#Investigate RQ: Does the effect of Deviation on Flow (main finding from previous paper) depend on level cumrun (how many runs the participant has played). Include all runs.
 
-#Model R^2:
+#Fit and view model (note: could also try random slope/intercept for deviation*cumrun):
+fss_learning2_lmer <- lmer(flow ~ deviation*cumrun + (deviation|participant), data=fss_learning)
+summary(fss_learning2_lmer)
+anova(fss_learning2_lmer)
 r.squaredGLMM(fss_learning2_lmer)
 
 #Test model assumptions:
@@ -41,10 +66,10 @@ qqline(residuals(fss_learning2_lmer))
 qqmath(ranef(fss_learning2_lmer, condVar = TRUE), strip = TRUE)
 
 #Model assumptions suggest the model is "not great, not terrible" (i.e. "3.6").
-#Fit model using robust lmm:
-fss_learning2_rlmer <- rlmer(flow ~ deviation*cumrun + (deviation|participant), data=fss_learning)
-summary(fss_learning2_rlmer)
-plot(fss_learning2_rlmer)
+#Fit model using robust lmm (COMMENTED OUT IN RMD DUE TO LONG SIMULATION TIME):
+# fss_learning2_rlmer <- rlmer(flow ~ deviation*cumrun + (deviation|participant), data=fss_learning)
+# summary(fss_learning2_rlmer)
+# plot(fss_learning2_rlmer)
 
 #Plot interaction:
 plot_model(fss_learning2_lmer, type = "pred", terms = c("deviation", "cumrun"), mdrt.values = "meansd")
@@ -64,8 +89,7 @@ flow_interaction <- as.data.frame(flow_interaction)
 flow_interaction$cumrun <- as.factor(flow_interaction$cumrun)
 ggplot(flow_interaction, aes(x=deviation, y=fit, colour=cumrun)) + geom_line()
 
-#For participant-wise visualization, calculate slopes and intercepts of deviation at various levels of moderator (cumrun) for each participant.
-#Here we're essentially just fitting LMs to each participant separately.
+#For participant-wise visualization, calculate slopes and intercepts of deviation at various levels of moderator (cumrun) for each participant. Fit LMs for each participant separately.
 slope_intercept_dataframes = list()
 fss_models <- list()
 for (i in 1:length(unique(fss_learning$participant))) {
@@ -77,8 +101,7 @@ for (i in 1:length(unique(fss_learning$participant))) {
   flow_interaction <- as.data.frame(flow_interaction)
   flow_interaction$ID <- as.factor(i)
   flow_interaction$cumrun <- as.factor(flow_interaction$cumrun)
-  #flow_interaction$ID <- as.factor(flow_interaction$ID)
-  flow_interaction <- flow_interaction %>% mutate(slope_minusSD = fit[3]-fit[1], #slope is the difference in FIT between 1 unit increment in deviation
+  flow_interaction <- flow_interaction %>% mutate(slope_minusSD = fit[3]-fit[1], #slope is the difference in FIT between 1 unit increments of deviation
                                                   slope_MEAN = fit[6]-fit[4],
                                                   slope_plusSD = fit[9]-fit[7],
                                                   intercept_minusSD = fit[2], #intercept is the value of fit when deviation = 0
@@ -88,20 +111,20 @@ for (i in 1:length(unique(fss_learning$participant))) {
   fss_models[[i]] = temp_model
 }
 
-#Grab p-values, sort from lowest to highest, and adjust using Bonferroni-Holm
+#Get p-values, sort from lowest to highest, and adjust using Bonferroni-Holm
 fss_Pvalues <- list()
 for (i in 1:18) {
   fss_Pvalues[[i]] <- anova(fss_models[[i]])$"Pr(>F)"[3]
 }
 fss_Pvalues <- as.data.frame(fss_Pvalues) 
-colnames(fss_Pvalues) <- c(1:18)
+colnames(fss_Pvalues) <- c(1:18) #18 = number of participants
 fss_Pvalues <- sort(fss_Pvalues)
 fss_Pvalues_holm <- p.adjust(fss_Pvalues, "holm")
 
-#Grab order of participants for plotting
+#Get order of participants for plotting
 part_levels <- as.integer(names(fss_Pvalues))
 
-#Reorder levels in data; now according to p-value, from low (significant) to high (nonsignificant):
+#Reorder levels in data according to p-value, from low (significant) to high (non-significant):
 fss_learning$ID <- factor(fss_learning$ID, levels=part_levels)
 
 #Start plotting results. First assign initial plot as flow_fig
@@ -121,13 +144,7 @@ flow_fig <- ggplot(fss_learning, aes(deviation, flow)) +
         panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
         strip.background=element_rect(fill="grey"))
 
-#Function for plotting. (Custom colors for facets couldn't be done using ggplot() directly)
-#COLOR THEMES, please change your desired alpha level (below which results are "statistically significant")
-#INTERPRETATION: 
-#Light green panels = interaction deviation*cumrum is statistically significant after bonferroni-holm correction for 18 multiple comparisons
-#Dark green panels = interaction deviation*cumrum is statistically significant without correcting for multiple comparisons
-#Grey panels = deviation*cumrum is not statistically significant
-
+#Facet panel coloring function for plotting. Allows for changing desired alpha level (below which results are "statistically significant"). * LIGHT GREEN PANELS = interaction deviation*cumrum is statistically significant, given alpha level, after bonferroni-holm correction for 18 multiple comparisons. * DARK GREEN PANELS = interaction deviation*cumrum is statistically significant, given alpha level, without correcting for multiple comparisons. * GREY PANELS = deviation*cumrum is not statistically significant, given alpha level.
 panel_colors <- function(alpha_level) {
   
   holm_adjusted_values <- rep("yellowgreen", sum(fss_Pvalues_holm < alpha_level))
@@ -146,87 +163,13 @@ panel_colors <- function(alpha_level) {
     g$grobs[[i]]$grobs[[1]]$children[[j]]$gp$fill <- fills[k]
     k <- k+1
   }
-  
-  #Draw figure
   grid.draw(g)
-    
 }
-  
-panel_colors(.05) #these functions may take a bit of time to load so be patient!
-#panel_colors(.07)
-#panel_colors(.005)
+
+#Draw figure with alpha level at .05:
+grid.newpage() #these allow knitr to draw everything (otherwise grid.draw() and ggplot() clash)
+panel_colors(.05)
+
+#Draw figure with alpha level at .1:
+grid.newpage()
 panel_colors(.1)
-
-
-
-
-#################################
-#################################
-#################################
-###Below here stuff for safekeeping that I will probably use later.
-
-#+theme(panel.background=element_rect(fill='white', colour='black'),
- #      strip.background=element_rect(fill='white', colour='white'))
-  
-
-# flow_all_figs <- ggarrange(one, two, three, font.label = list(size = 10, color = "black", face = "bold"), common.legend = TRUE, legend="bottom", hjust = -0.25, ncol = 3, nrow = 1)
-# 
-# flow_all_figs <- annotate_figure(flow_all_figs,
-#                                 bottom = text_grob("Deviation score", color = "black", size=14),
-#                                 fig.lab = NULL, fig.lab.face = NULL)
-
-
-#Flow subscales and perceived importance
-
-#PI scale:
-#1: Koin pelissä onnistumisen tärkeäksi
-#2: Minusta tuntui siltä, etten saisi tehdä yhtäkään virhettä
-#3: Pelkäsin epäonnistuvani
-
-#2 and 3 are negatively framed, and #3 has an inverse relation with deviation! Thus, probably not wise to combine as singular scale
-
-# psych::alpha(fss_learning[,16:18])
-# fss_learning_lmer <- lmer(pi2 ~ deviation + (deviation|participant), data=fss_learning)
-# summary(fss_learning_lmer)
-# 
-# ggplot(fss_learning, aes(deviation, pi2)) +
-#   geom_point(alpha=.6, size=2) +
-#   geom_smooth(method = "lm", se = FALSE, fullrange=TRUE) + 
-#   facet_wrap(~participant) +
-#   theme_bw(base_size = 14)
-
-
-# jet.colors <- colorRampPalette(matlab.like(9))
-# ggplot(gg, aes(x=age, y=hrs, z=charges))+
-#   stat_contour(aes(color=..level..),binwidth=200, size=2)+
-#   scale_color_gradientn(colours=jet.colors(8))
-
-#maybe useful at some point..
-# all(is.na(temp_data$flow))
-# all(is.na(temp_data$deviation))
-# all(is.na(temp_data$cumrun))
-
-
-# fss_models = list()
-# for (i in 1:length(unique(fss_learning$participant))) {
-#   fss_models[[i]] = lm(flow ~ deviation*cumrun, data=subset(fss_learning, ID==i))
-# }
-# 
-# fss_plots = list()
-# for (i in 1:length(fss_models)) {
-#   fss_plots[[i]] = plot_model(fss_models[[i]], type = "int", terms = c("deviation", "cumrun"), 
-#                               mdrt.values = "meansd", axis.title="", title="", axis.labels="") + 
-#     xlab(NULL)
-# }
-# 
-# 
-# fss_all_plots <- ggarrange(fss_plots[[1]], fss_plots[[2]], fss_plots[[3]], fss_plots[[4]], fss_plots[[5]],
-#                            fss_plots[[6]], fss_plots[[7]], fss_plots[[8]], fss_plots[[9]], fss_plots[[10]],
-#                            fss_plots[[11]], fss_plots[[12]], fss_plots[[13]], fss_plots[[14]], fss_plots[[15]],
-#                            fss_plots[[16]], fss_plots[[17]], fss_plots[[18]], 
-#                            font.label = list(size = 10, color = "black", face = "bold"), common.legend = TRUE, legend="right", hjust = -0.25, ncol = 4, nrow = 5)
-# 
-# fss_all_plots <- annotate_figure(fss_all_plots,
-#                                  left = text_grob("Flow scores", color = "black", size=14, rot = 90),
-#                                  bottom= text_grob("Deviation score", color ="black", size=14),
-#                                  fig.lab = NULL, fig.lab.face = NULL)
