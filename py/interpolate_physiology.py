@@ -71,7 +71,7 @@ ax1.plot(ts, 1.0/eda, '-')
 #ax1.set_xlim(0,ts[len(ts)-1])
 ax1.set_title('raw eda')
 
-ax2.plot(rundata, 1.0/final_eda, '-')
+ax2.plot(rundata, 1.0/final_eda, '-') 
 #ax2.set_xlim(0, ts[len(ts)-1])
 ax2.set_title('interpolated eda')
 
