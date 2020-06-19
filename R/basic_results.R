@@ -114,6 +114,8 @@ qqnorm(residuals(flow_dev_lmer)) #qq-plot
 qqline(residuals(flow_dev_lmer)) #line of "perfect normality"
 
 
+
+
 ### exploration with MWE confidence bands as documented in Korpela et al. (2014) ----
 # Plots of all signals with mean sample means (thick solid line), their 95% MWEs (dashed lines), 
 # and naive 95% quantiles (dotted thin lines) are shown below. The naive quantiles are computed per 
