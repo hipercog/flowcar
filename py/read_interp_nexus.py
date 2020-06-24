@@ -7,11 +7,17 @@ Created on Fri Jun 19 21:34:44 2020
 """
 
 import os, sys, math, json, csv
+import numpy as np
 
 #DEBUG
 #inpath = '/media/bcowley/Transcend/flowcar-backup/01/Nexus_data/session_01-01/'
 #nxfile = 'nexus_1573639466.0630298.txt'
 
+def getframes(YEAR = '2017'): # change to a parameter when ready for both data types
+    frames = open(os.path.join(os.path.dirname(__file__), 'Frames' + YEAR + '.csv'))
+    frames = list(csv.reader(frames))
+    frames = np.asarray(frames)
+    return frames
 
 # Get signal out of JSON file
 def getsig(nxfile, sigs):
@@ -39,29 +45,44 @@ def getsig(nxfile, sigs):
     return nxdata
 
 
-# Function walks through folders under given path & parses any nexus files found
-# default-coded name of signal to read
-def parse_nxs(inpath, sigs):
+# Function parses given nexus file, 
+def parse_nxs(inf, chans = ['A', 'B', 'E', 'F']):
+    dat = getsig(inf, chans)
+# parse inf for subject, session, run indices
+    
+# Get correct frame for this subject, session, run from frames;
+    idx = frames[:,0]
+    
+# Get world time stamp data from pupil folder
+# Get the run times from cogcarsim database
+# zero the dat timestamp data, and interp based on cogcarsim
+    return dat
+
+# Function walks through folders under given path & processes any nexus files found
+def traversi(inpath, sigs = ['EDA', 'BVP', 'EOG']):
     sigmap = {'EDA':'E', 'EOG':['A', 'B'], 'BVP':'F'}
     inpath = os.path.abspath(inpath)
     for root, subdirs, files in os.walk(inpath):
         for f in files:
-            if f.startswith('nexus'):
+            if f.startswith('nexus') & f.endswith('.txt'):
                 nxf = os.path.join(root, f)
                 print('Found Nexus, parsing ' + sigs + ' from ' + nxf)
-                dat = getsig(nxf, sigmap[sigs])
-                outf = os.path.join(root, sigs + '_' + f[0:-4] + '.csv')
-                outf = open(outf, "w", newline="")
-                writer = csv.writer(outf)
-                writer.writerows(dat)
+                dat = parse_nxs(nxf, sigmap(sigs))
+                for s in sigs:
+                    outf = os.path.join(root, s + '_' + f[0:-4] + '.csv')
+                    outf = open(outf, "w", newline="")
+                    writer = csv.writer(outf)
+#                    Extract + write timestamps and correct columns from dat
+                    writer.writerows(dat)
 
             if subdirs != []:
                 print('Going deeper')
                 for s in subdirs:
-                    parse_nxs(s)
+                    traversi(s)
 
-if __name__ == "__main__":
-    parse_nxs(sys.argv[1], sys.argv[2])
+#if __name__ == "__main__":
+#    parse_nxs(sys.argv[1], sys.argv[2])
 
 #DEBUG
+frames = getframes()
 #parse_nxs(inpath, 'EOG')

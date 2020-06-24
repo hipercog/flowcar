@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Jun 12 21:34:44 2020
+
+@author: bcowley
+"""
 import os, sys, math, json, csv
 
 #DEBUG
