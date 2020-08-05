@@ -1,6 +1,11 @@
-import json
-import csv
-import os, sys
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Jun 12 21:34:44 2020
+
+@author: bcowley
+"""
+import os, sys, math, json, csv
 
 #DEBUG
 #inpath = '/media/bcowley/Transcend/flowcar-backup/01/Nexus_data/session_01-01/'
@@ -10,15 +15,24 @@ import os, sys
 # Get signal out of JSON file
 def getsig(nxfile, sigs):
     nxdata = []
+    #    create default data in case there are reading problems
+    nx_ts_i = {'ts':math.nan}
+    nx_sg_i = dict((k,math.nan) for k in sigs)
     with open(nxfile) as f:
+        i = 0
         for line in f:
-            json_object = json.loads(line)
-            nx_ts_i = json_object[0]
-            nx_sg_i = json_object[1]
-            fields = [nx_ts_i[1]]
-            for s in sigs:
-                fields.append(nx_sg_i[s])
-            nxdata.append(fields)
+            i += 1
+            try:
+                json_object = json.loads(line)
+                nx_ts_i = json_object[0]
+                nx_sg_i = json_object[1]
+            except:
+                print("JSON line-" + str(i) + " read error for line: " + line)
+            else:
+                fields = [nx_ts_i[1]]
+                for s in sigs:
+                    fields.append(nx_sg_i[s])
+                nxdata.append(fields)
             
         f.close()
     return nxdata
