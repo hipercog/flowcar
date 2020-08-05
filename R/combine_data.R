@@ -92,10 +92,11 @@ fss <-
 head(fss) # Flow + importance items Q1-Q13, skill-demand items A1-A3 (not used here)
 
 # indicate fss questions for flow factors: fluency, absorption, flow, perceived importance
-fluency_items <- c('Q2', 'Q4', 'Q5', 'Q7', 'Q8', 'Q9')
-abs_items <- c('Q1', 'Q3', 'Q6', 'Q10')
+fluency_items <- c('Q2', 'Q7', 'Q8', 'Q9')
+abs_items <- c('Q3', 'Q4', 'Q5', 'Q6', 'Q10') # NOTE THAT 1) Q1 has been removed, 2) items Q4 and Q5 now load onto absorption, due to theoretical and cfa issues!
 flow_items <- c(fluency_items, abs_items)
 pi_items <- c('Q11', 'Q12', 'Q13')
+additional_items <- c('A1', 'A2', 'A3') #additional items! (line added 8.7.20)
 #pi_items <- c('Q11', 'Q12')
 
 
@@ -109,7 +110,10 @@ fss_items <- fss %>%
   rename(pi1 = Q11,
          pi2 = Q12,
          pi3 = Q13) %>%
-  dplyr::select(participant:run, fluency, absorption, flow, pi1:pi3, pi_total) %>%
+  rename(comp1 = A1,
+         comp2 = A2,
+         comp3 = A3) %>% ##additional items on perceived competence! (line added 8.7.20)
+  dplyr::select(participant:run, fluency, absorption, flow, pi1:pi3, comp1:comp3, pi_total) %>%
   # mutate participant variable into the right format (1 -> "01")
   mutate(participant = formatC(participant, width = 2, format = "d", flag = "0"))
 
@@ -139,17 +143,17 @@ fss_learning <- fss_game %>%
        data_aug = map(fit, augment)) %>% #...get predictions
   unnest(coef) %>%
   # predicted curve slope and interception
-  select(participant, term, estimate, data_aug) %>%
+  dplyr::select(participant, term, estimate, data_aug) %>%
   spread(term, estimate) %>%
   rename(slope = ln.cumrun,
        intercept = `(Intercept)`) %>%
   unnest(data_aug) %>%
   ungroup %>%
   # join new ones to fss_game -> fss_learning
-  select(participant:.fitted, intercept, slope) %>%
+  dplyr::select(participant:.fitted, intercept, slope) %>%
   rename(learning_curve = .fitted) %>%
   left_join(fss_game, by = c('participant', 'ln.duration', 'ln.cumrun')) %>%
-  select(participant, session, run, everything()) %>%
+  dplyr::select(participant, session, run, everything()) %>%
   # acquire  deviation from predicted curve
   mutate(deviation = ln.duration - learning_curve) %>%
   group_by(participant) %>%

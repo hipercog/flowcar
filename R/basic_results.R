@@ -49,7 +49,6 @@ ggplot(fss_learning, aes(cumrun, duration)) +
   theme_bw(base_size = 14)
 if (FIGOUT)  ggsave(file.path(odir, "PerfXsubj_powerlaw.svg"))
 
-
 # plot linear performance with power law fit and flow z-scores coloring
 ggplot(fss_learning, aes(cumrun, duration, color = z.flow)) +
   geom_point(alpha=.6, size=2) +
@@ -60,22 +59,69 @@ ggplot(fss_learning, aes(cumrun, duration, color = z.flow)) +
 if (FIGOUT)  ggsave(file.path(odir, "PerfXsubj_powlxFlow.svg"))
 
 # plot log-log with flow z-scores coloring
-ggplot(fss_learning, aes(ln.cumrun, ln.duration, color = z.flow)) +
+rq1a <- ggplot(fss_learning, aes(ln.cumrun, ln.duration, color = z.flow)) +
+  geom_point(alpha=.6, size=1) +
+  geom_smooth(method = "lm", se = FALSE, linetype = 1, size = 0.5, color="red") +
+  facet_wrap(~participant) +
+  scale_color_viridis(name="Z_Flow", guide = guide_colorbar(title.position = "top")) +
+  xlab("ln(Cumulative runs)") + ylab("ln(Duration)") +
+  labs(title = "A") +
+  theme(legend.position = c(x=.8, y=.1),
+        legend.background = element_rect(fill="white"),
+        legend.box.background = element_rect(colour = "black"),
+        legend.direction='horizontal',
+        panel.background = element_rect(fill = "white",
+                                        colour = "lightgrey",
+                                        size = 0.5, linetype = "solid"),
+        panel.grid.major = element_line(size = 0.25, linetype = 'solid',
+                                        colour = "grey"),
+        axis.text.x = element_text(size=8),
+        axis.text.y = element_text(size=8),
+        axis.line = element_line(colour = "black"),
+        strip.background=element_rect(fill="lightgrey", color="black"))
+if (FIGOUT)  ggsave(file.path(odir, "PerfXsubj_powlxFlow_loglog.svg"))
+
+
+# same as above, subset for ID > 9
+ggplot(subset(fss_learning, as.numeric(ID) > 9), aes(ln.cumrun, ln.duration, color = z.flow)) +
   geom_point(alpha=.6, size=2) +
   geom_smooth(method = "lm", se = FALSE, linetype = 1, size = 0.5, color="red") +
   facet_wrap(~participant) +
   scale_color_viridis() +
   theme_bw(base_size = 14)
-if (FIGOUT)  ggsave(file.path(odir, "PerfXsubj_powlxFlow_loglog.svg"))
 
 # plot deviation from predicted curve
-ggplot(fss_learning, aes(deviation, flow)) +
-  geom_point(alpha=.6, size=2) +
+rq1b <- ggplot(fss_learning, aes(deviation, flow)) +
+  geom_point(alpha=.4, size=1) +
   geom_smooth(method = "lm", se = FALSE) + 
+  xlab("Deviation score") + ylab("Flow") +
   facet_wrap(~participant) +
-  theme_bw(base_size = 14)
+  labs(title = "B") +
+  theme(legend.position = c(x=.8, y=.1),
+        legend.background = element_rect(fill="white"),
+        legend.box.background = element_rect(colour = "black"),
+        legend.direction='horizontal',
+        panel.background = element_rect(fill = "white",
+                                        colour = "lightgrey",
+                                        size = 0.5, linetype = "solid"),
+        panel.grid.major = element_line(size = 0.25, linetype = 'solid',
+                                        colour = "grey"),
+        axis.text.x = element_text(size=8),
+        axis.text.y = element_text(size=8),
+        axis.line = element_line(colour = "black"),
+        strip.background=element_rect(fill="lightgrey", color="black"))
 if (FIGOUT)  ggsave(file.path(odir, "FlowXdevXsubj.svg"))
 
+# same as above, subset for ID > 9
+ggplot(subset(fss_learning, as.numeric(ID) > 9), aes(deviation, flow)) +
+  geom_point(alpha=.6, size=2) +
+  geom_smooth(method = "lm", se = FALSE, linetype = 1, size = 0.5, color="red") +
+  facet_wrap(~participant) +
+  scale_color_viridis() +
+  theme_bw(base_size = 14)
+
+#Combine Rq1a and b into panel figure
+RQ1 <- ggarrange(rq1a, rq1b, font.label = list(size = 10, color = "black", face = "bold"), common.legend = FALSE, hjust = -0.25, ncol = 2, nrow = 1)
 
 ### statistical test (linear mixed model) ----
 fss_learning_lmer <- lmer(flow ~ deviation + (deviation|participant), data=fss_learning)
@@ -83,6 +129,23 @@ summary(fss_learning_lmer) # model summary
 plot(fss_learning_lmer) # model diagnostics
 qqnorm(residuals(fss_learning_lmer)) #qq-plot
 qqline(residuals(fss_learning_lmer)) #line of "perfect normality"
+
+### statistical test (linear mixed model), subset with ID > 9 ----
+fss_learning_lmer_subset <- lmer(flow ~ deviation + (deviation|participant), data=subset(fss_learning, as.numeric(ID) > 9))
+summary(fss_learning_lmer_subset) # model summary
+plot(fss_learning_lmer_subset) # model diagnostics
+qqnorm(residuals(fss_learning_lmer_subset)) #qq-plot
+qqline(residuals(fss_learning_lmer_subset)) #line of "perfect normality"
+
+### statistical test (linear mixed model), subset with ID > 9, effect of learning, both power-law and exponential ----
+fss_learning_lmer_subset2p <- lmer(ln.duration ~ ln.cumrun + (ln.cumrun|participant), data=subset(fss_learning, as.numeric(ID) > 9))
+fss_learning_lmer_subset2e <- lmer(duration ~ ln.cumrun + (ln.cumrun|participant), data=subset(fss_learning, as.numeric(ID) > 9))
+summary(fss_learning_lmer_subset2p) # model summary
+plot(fss_learning_lmer_subset2p) # model diagnosticsi
+qqnorm(residuals(fss_learning_lmer_subset2p)) #qq-plot
+qqline(residuals(fss_learning_lmer_subset2p)) #line of "perfect normality"
+
+
 
 
 
@@ -97,9 +160,9 @@ qqline(residuals(fss_learning_lmer)) #line of "perfect normality"
 
 # First, make data wide by cumruns on duration
 dat <- game_data %>%
-  select(participant, cumrun, duration) %>%
+  dplyr::select(participant, cumrun, duration) %>%
   pivot_wider(names_from = cumrun, values_from = duration) %>%
-  select(-participant)
+  dplyr::select(-participant)
 # index NAs - MWE cannot handle these
 idx <- which(apply(dat,2,function(x) all(!is.na(x))))
 
@@ -130,7 +193,7 @@ plotlines_comp(curve19, idx, col="blue")
 # NB: non-linear factors can be added as (or whatever model you want): 
 #   duration + I(duration^2) 
 #   duration + I(log(duration))
-df.growth <- fss_game %>% select(1:9)
+df.growth <- fss_game %>% dplyr::select(1:9)
 # ---- UNCONDITIONAL MEANS MODEL - BASE COMPARISON MODEL ----
 um.fit <- lme(fixed = duration ~ 1, 
               random = ~ 1|participant, 
