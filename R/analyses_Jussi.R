@@ -1044,9 +1044,10 @@ alpha_calculator <- function(subscale=1) {
     names(alphas)[1] <- "alpha"
     
     return(ggplot(alphas, aes(x=alpha)) + geom_histogram(alpha=.7, color="grey", fill="firebrick") +
-             scale_x_continuous(name = NULL, breaks=c(0.55, 0.65, 0.75, 0.85, 0.95), limits=c(0.50, 1)) +
-             ylab("Count") + labs(title="Full FSS scale") + scale_y_continuous(breaks=c(1,2,3,4,5,6,7,8,9), limits=c(0,9)) +
-             theme_classic(base_size=12))
+            scale_x_continuous(name = NULL, breaks=c(0.55, 0.65, 0.75, 0.85, 0.95)) +
+            ylab("Count") + labs(title="Full FSS scale") + scale_y_continuous(breaks=c(1,2,3,4,5,6,7,8,9), limits=c(0,9)) +
+            theme_classic(base_size=12))
+
   }
   else if (subscale == 2) {
     for (i in 1:length(unique(cronbachs_alphas$run_session))) { #calculate cronbach's alpha separately for each run
@@ -1058,7 +1059,7 @@ alpha_calculator <- function(subscale=1) {
     names(alphas)[1] <- "alpha"
     
     return(ggplot(alphas, aes(x=alpha)) + geom_histogram(alpha=.7, color="grey", fill="firebrick") +
-             scale_x_continuous(name = NULL, breaks=c(0.55, 0.65, 0.75, 0.85, 0.95), limits=c(0.50, 1)) +
+             scale_x_continuous(name = NULL, breaks=c(0.55, 0.65, 0.75, 0.85, 0.95)) +
              ylab(NULL) + labs(title="Fluency of performance") + scale_y_continuous(breaks=c(1,2,3,4,5,6,7,8,9), limits=c(0,9)) +
              theme_classic(base_size=12))
   }
@@ -1072,7 +1073,7 @@ alpha_calculator <- function(subscale=1) {
     names(alphas)[1] <- "alpha"
     
     return(ggplot(alphas, aes(x=alpha)) + geom_histogram(alpha=.7, color="grey", fill="firebrick") +
-             scale_x_continuous(name = NULL, breaks=c(0.55, 0.65, 0.75, 0.85, 0.95), limits=c(0.50, 1)) +
+             scale_x_continuous(name = NULL, breaks=c(0.80, 0.85, 0.90, 0.95)) +
              ylab(NULL) + labs(title="Absorption by activity") + scale_y_continuous(breaks=c(1,2,3,4,5,6,7,8,9), limits=c(0,9)) +
              theme_classic(base_size=12))
   }
@@ -1098,6 +1099,71 @@ mlr(cronbachs_alphas, grp = "ID", Time = "run_session", items = c("Q2", "Q3", "Q
 # names(uusfreimi)[3] <- "flow"
 # names(uusfreimi)[1] <- "learning"
 # ggplot(uusfreimi, aes(flow, learning)) + geom_point() + geom_smooth(method="lm")
+
+
+#Visualize spread of measurement sessions in time
+game_data2 <- game_data %>% group_by(participant, session) %>% dplyr::summarize(session = mean(session), date=mean.Date(as.Date(date))) %>%
+  mutate(year=as.factor(ifelse(as.integer(participant)>9, 2019, 2017)))
+
+#Tricky way to make the plotting work: here we substitute year 2017 with year 2019 so that free-scale faceting works better
+game_data2$date <- sub("2017", "2019", game_data2$date)
+game_data2$date <- as.Date(game_data2$date)
+
+game_data2 <- game_data2 %>% mutate(physiology = as.factor(ifelse(session == 2 | session == 3 | session == 4, 0, 1)))
+
+#Create separate dataframes to call for geom_text (enables drawing two different texts for facetet grids)
+data.year2017 <- data.frame(participant=6,date=as.Date("2020-1-6"),session=NA,year=as.factor(2017))
+data.year2019 <- data.frame(participant=6,date=as.Date("2020-1-6"),session=NA,year=as.factor(2019))
+
+ggplot(game_data2, aes(participant, date, group=factor(session))) + geom_point(aes(color=physiology), size=2.5, alpha=.8) + coord_flip() + 
+  facet_wrap("year") + #use scales="free_x" if year 2017 is NOT replaced by 2019
+  scale_y_date(date_breaks = "weeks" , date_labels = "%b-%d") +
+  scale_color_discrete(name=NULL, labels=c("No physiologial measures", "Physiological measures")) +
+  theme(axis.text.x = element_text(angle = -60, hjust = 0),
+        panel.background = element_rect(fill = "white",
+                                        colour = "lightgrey",
+                                        size = 0.5),
+        legend.key=element_blank(),
+        legend.position="bottom",
+        axis.title.y = element_text(size=14),
+        axis.title.x = element_text(size=14),
+        legend.text = element_text(size=12),
+        panel.border = element_blank(),
+        panel.grid.major = element_line(size = 0.25, colour = "grey"),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "black"),
+        strip.background=element_rect(fill="lightgray"),
+        strip.text.x = element_text(size=12)) + 
+  geom_hline(yintercept = as.Date("2020-01-1"), linetype="dashed", color ="blue", size=0.5) +
+  geom_text(aes(label=session), hjust=0, vjust=0, size=3) +
+  geom_text(data=data.year2017, aes(x=participant, y=date), inherit.aes=FALSE, label="2018", 
+            color="blue", size=3) +
+  geom_text(data=data.year2019, aes(x=participant, y=date), inherit.aes=FALSE, label="2020", 
+            color="blue", size=3) +
+  ylab(NULL) + xlab("Participant")
+
+
+
+#Check if physiological measures affect results:
+
+fss_learning_full_phys <- fss_learning_full %>% mutate(physiology_dich = as.factor(ifelse(session == 2 | session == 3 | session == 4, 0, 1)))
+
+#replication, using only 2017 data, controlling was physiology vs not:
+summary(lmer(flow ~ deviation + physiology_dich + (1|participant), data=subset(fss_learning_full_phys, as.numeric(ID)>9)))
+
+#main finding, using combined datasets:
+summary(lmer(flow ~ deviation*cumrun + physiology_dich + (1|participant), data=fss_learning_full_phys))
+
+#association with flow:
+physiology_model <- lmer(flow ~ physiology_dich + (1|participant), data=fss_learning_full_phys)
+
+#plots (ugly ones):
+ggplot(fss_learning_full_phys, aes(deviation, flow, colour=physiology_dich)) + geom_smooth(method="lm", se=FALSE, size=0.4) + geom_point(alpha=.4, size=0.5) + facet_wrap("ID") 
+
+ggplot(fss_learning_full_phys, aes(physiology_dich, flow)) + geom_point(alpha=.3) + 
+  stat_summary(fun = median, geom = "point",
+               size = 2, color="firebrick")
+
 
 #################################
 #################################
@@ -1169,3 +1235,8 @@ mlr(cronbachs_alphas, grp = "ID", Time = "run_session", items = c("Q2", "Q3", "Q
 #'   }
 #'   
 #'   
+#'   
+#'   
+#'   
+
+
