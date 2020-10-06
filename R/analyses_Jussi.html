@@ -1656,7 +1656,7 @@ suppressPackageStartupMessages(library(grid))
 suppressPackageStartupMessages(library(here))
 
 # load data
-indir &lt;- file.path(here(), '..', 'data')
+indir &lt;- file.path(here(), &#39;..&#39;, &#39;data&#39;)
 fss_learning &lt;- read.csv(file.path(indir, &quot;fss_learning.csv&quot;))
 
 #Create integer variable for participants (ID)
@@ -1686,7 +1686,7 @@ anova(lmer(flow ~ deviation + (deviation|participant), data=fss_learning_sub))</
 #Fit and view model (note: could also try random slope/intercept for deviation*cumrun):
 fss_learning2_lmer &lt;- lmer(flow ~ deviation*cumrun + (deviation|participant), data=fss_learning)
 summary(fss_learning2_lmer)</code></pre>
-<pre><code>## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+<pre><code>## Linear mixed model fit by REML. t-tests use Satterthwaite&#39;s method [
 ## lmerModLmerTest]
 ## Formula: flow ~ deviation * cumrun + (deviation | participant)
 ##    Data: fss_learning
@@ -1711,7 +1711,7 @@ summary(fss_learning2_lmer)</code></pre>
 ## cumrun             0.003377   0.001797 680.220809   1.879   0.0606 .  
 ## deviation:cumrun  -0.295037   0.037062 691.727935  -7.961 7.03e-15 ***
 ## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
 ## 
 ## Correlation of Fixed Effects:
 ##             (Intr) devitn cumrun
@@ -1725,7 +1725,7 @@ summary(fss_learning2_lmer)</code></pre>
   </script>
 </div>
 <pre class="r"><code>r.squaredGLMM(fss_learning2_lmer)</code></pre>
-<pre><code>## Warning: 'r.squaredGLMM' now calculates a revised statistic. See the help page.</code></pre>
+<pre><code>## Warning: &#39;r.squaredGLMM&#39; now calculates a revised statistic. See the help page.</code></pre>
 <pre><code>##            R2m       R2c
 ## [1,] 0.2040548 0.5244473</code></pre>
 <pre class="r"><code>#Test model assumptions:
@@ -1829,13 +1829,13 @@ panel_colors &lt;- function(alpha_level) {
   all_values &lt;- c(holm_adjusted_values,non_adjusted_values,non_significant_values)
   
   g &lt;- ggplot_gtable(ggplot_build(flow_fig))
-  stripr &lt;- which(grepl('strip-t', g$layout$name))
+  stripr &lt;- which(grepl(&#39;strip-t&#39;, g$layout$name))
   stripr &lt;- rev(stripr[-c(4:5)])
   stripr &lt;- c(rev(stripr[1:5]), rev(stripr[6:10]), rev(stripr[11:15]), rev(stripr[16:18]))
   fills &lt;- all_values
   k &lt;- 1
   for (i in stripr) {
-    j &lt;- which(grepl('rect', g$grobs[[i]]$grobs[[1]]$childrenOrder))
+    j &lt;- which(grepl(&#39;rect&#39;, g$grobs[[i]]$grobs[[1]]$childrenOrder))
     g$grobs[[i]]$grobs[[1]]$children[[j]]$gp$fill &lt;- fills[k]
     k &lt;- k+1
   }

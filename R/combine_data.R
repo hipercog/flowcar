@@ -116,16 +116,13 @@ fss_items <- fss %>%
   rename(pi1 = Q11,
          pi2 = Q12,
          pi3 = Q13) %>%
-<<<<<<< HEAD
   rename(comp1 = A1,
          comp2 = A2,
          comp3 = A3) %>% ##additional items on perceived competence! (line added 8.7.20)
   dplyr::select(participant:run, fluency, absorption, flow, pi1:pi3, comp1:comp3, pi_total) %>%
-=======
-  dplyr::select(participant:run, fluency, absorption, flow, pi1:pi3, pi_total) %>%
+  #dplyr::select(participant:run, fluency, absorption, flow, pi1:pi3, pi_total) %>%
   # create ID = integer factor for participants
   mutate(ID = as.factor(as.integer(participant))) %>%
->>>>>>> 44ab4487eaab69f8cca622cde7d8ca89906e2933
   # mutate participant variable into the right format (1 -> "01")
   mutate(participant = formatC(participant, width = 2, format = "d", flag = "0"))
 

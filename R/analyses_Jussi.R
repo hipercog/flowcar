@@ -261,9 +261,31 @@ sliding_window_within <- function(window_width = 10, result=2) {
   estimates_IDwise <- as.data.frame(unlist(estimates_IDwise)) 
   estimates_IDwise <- estimates_IDwise %>% mutate(sliding_window=rep(c(1:(length(unique(fss_learning$cumrun))-window_width)), 18), 
                                                   ID=rep(1:18, each=length(unique(fss_learning$cumrun))-window_width)) #18 is number of participants
+ 
   names(estimates_IDwise)[1] <- "estimate"
   permuted_estimates <- estimates_IDwise %>% group_by(ID) %>% 
     transform(estimate = sample(estimate))
+  
+  #code for sorting facets based on slope
+  #First, fit linear model separately for each participant with sliding window as predictor and slope estimate as DV
+  #then grab the slope estimate of that model, and sort according to the values (this is essentially the same as above for p-values)
+  estimates_slope <- list()
+  counter = 0
+  for (x in 1:length(unique(estimates_IDwise$ID))) {
+    estimates_temp <- subset(estimates_IDwise, ID==x)
+    temp_model <- lm(estimate ~ sliding_window, data=estimates_temp) 
+    counter = counter + 1
+    estimates_slope[[counter]] <- coef(summary(temp_model))[2,1]
+
+  }
+  
+  estimates_slope <- as.data.frame(rbind(unlist(estimates_slope)))
+  colnames(estimates_slope) <- c(1:18)
+  estimates_slope <- sort(estimates_slope)
+  part_levels <- as.integer(names(estimates_slope))
+  estimates_IDwise$ID <- factor(estimates_IDwise$ID, levels=part_levels)
+  #code for sorting facets based on slope ENDS
+  
   
   #choose which result to return (1=Participant-wise figure, 2=DATA VECTOR: permuted estimates, 3=DATA VECTOR: observed estimates):
   #participant-wise
@@ -764,7 +786,7 @@ fss_learning_misc <- lmer(flow ~ cumrun + (cumrun|participant / session), data=f
 #partially pooled lines + lms within session:
 ggplot(fss_learning, aes(cumrun, flow, group=session)) +
   geom_point(alpha=.3, size=1) +
-  geom_line(y=predict(fss_learning_misc), size=0.6, color="blue") +
+  geom_line(aes(y=predict(fss_learning_misc)), size=0.6, color="blue") +
   geom_smooth(method="lm", size=0.6, color="red", se=FALSE) +
   facet_wrap(~participant) +
   theme_bw(base_size = 14)
@@ -1017,7 +1039,7 @@ par(mfrow = c(1,2), mar=c(4.2,6,2,0), oma=c(0,0,0,4))
 plot.new()
 
 # plot regular R graphic in top-right quadrant
-plot(c(idx[1],idx[length(idx)]), c(rng[1], rng[2]+3) ,type="n", bty="n", xlab="", ylab="", main = NULL)
+plot(c(idx[1],idx[length(idx)]), c(rng[1], rng[2]+3) ,type="n", bty="n", xlab="Sliding window", ylab="", main = NULL)
 plotlines(curve, idx, col ="blue")
 
 # now add the first ggplot element which is going to take
@@ -1044,8 +1066,9 @@ alpha_calculator <- function(subscale=1) {
     names(alphas)[1] <- "alpha"
     
     return(ggplot(alphas, aes(x=alpha)) + geom_histogram(alpha=.7, color="grey", fill="firebrick") +
-            scale_x_continuous(name = NULL, breaks=c(0.55, 0.65, 0.75, 0.85, 0.95)) +
+            scale_x_continuous(name = NULL, breaks=c(0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95)) +
             ylab("Count") + labs(title="Full FSS scale") + scale_y_continuous(breaks=c(1,2,3,4,5,6,7,8,9), limits=c(0,9)) +
+            #coord_cartesian(xlim = c(0.55, max(alphas))) +
             theme_classic(base_size=12))
 
   }
@@ -1061,6 +1084,7 @@ alpha_calculator <- function(subscale=1) {
     return(ggplot(alphas, aes(x=alpha)) + geom_histogram(alpha=.7, color="grey", fill="firebrick") +
              scale_x_continuous(name = NULL, breaks=c(0.55, 0.65, 0.75, 0.85, 0.95)) +
              ylab(NULL) + labs(title="Fluency of performance") + scale_y_continuous(breaks=c(1,2,3,4,5,6,7,8,9), limits=c(0,9)) +
+             #coord_cartesian(xlim = c(0.55, max(alphas))) +
              theme_classic(base_size=12))
   }
   else if (subscale == 3) {
@@ -1073,8 +1097,9 @@ alpha_calculator <- function(subscale=1) {
     names(alphas)[1] <- "alpha"
     
     return(ggplot(alphas, aes(x=alpha)) + geom_histogram(alpha=.7, color="grey", fill="firebrick") +
-             scale_x_continuous(name = NULL, breaks=c(0.80, 0.85, 0.90, 0.95)) +
+             scale_x_continuous(name = NULL, breaks=c(0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95)) +
              ylab(NULL) + labs(title="Absorption by activity") + scale_y_continuous(breaks=c(1,2,3,4,5,6,7,8,9), limits=c(0,9)) +
+             #coord_cartesian(xlim = c(0.55, max(alphas))) +
              theme_classic(base_size=12))
   }
 }
@@ -1120,6 +1145,7 @@ ggplot(game_data2, aes(participant, date, group=factor(session))) + geom_point(a
   scale_y_date(date_breaks = "weeks" , date_labels = "%b-%d") +
   scale_color_discrete(name=NULL, labels=c("No physiologial measures", "Physiological measures")) +
   theme(axis.text.x = element_text(angle = -60, hjust = 0),
+        axis.text.y = element_blank(), #hide participant numbers for anonymity
         panel.background = element_rect(fill = "white",
                                         colour = "lightgrey",
                                         size = 0.5),
@@ -1163,7 +1189,6 @@ ggplot(fss_learning_full_phys, aes(deviation, flow, colour=physiology_dich)) + g
 ggplot(fss_learning_full_phys, aes(physiology_dich, flow)) + geom_point(alpha=.3) + 
   stat_summary(fun = median, geom = "point",
                size = 2, color="firebrick")
-
 
 #################################
 #################################
@@ -1238,5 +1263,65 @@ ggplot(fss_learning_full_phys, aes(physiology_dich, flow)) + geom_point(alpha=.3
 #'   
 #'   
 #'   
+#'   
 
+#perceived competence (comp2 = my level of competence is... (tarkista!))
+fss_items %>%
+  mutate(session = fct_reorder(as.factor(session), desc(comp2), .fun='median')) %>%
+  ggplot( aes(x=session, y=comp2)) + 
+  geom_violin() + geom_hline(aes(yintercept=median(comp2)), color="firebrick") +
+  geom_jitter(color="black", size=0.6, alpha=0.2, width=0.07) +
+  # geom_half_violin(trim=FALSE, fill="gray", side = "r") +
+  # geom_boxplot(width=0.1, outlier.shape = NA) +
+  #geom_text(aes(length(unique(fss_items$session)), median(fss_items$comp2), label = "med.\nFlow", vjust = -1)) +
+  labs(title="Comp1", x=NULL, y = NULL) +
+  ylim(2, 7) +
+  stat_summary(fun = median, geom = "point",
+               size = 2, color="firebrick") +
+  theme_classic(base_size=12)
+
+
+#Perceived competence increases session by session for participants 2-6, 10, 13-14, 16-17, i.e. 10/18, 55% of the participants
+#Overall trend and effect is positive.
+
+fss_learning_tempo <- fss_learning %>% dplyr::select(session, ID, comp2) %>% na.omit()
+fss_learning_tempo$ID <- factor(fss_learning_tempo$ID, levels=c(1:18))
+
+#Sort participants according to slope values
+estimates_slope <- list()
+counter = 0
+for (x in 1:length(unique(fss_learning_tempo$ID))) { #iterate through each ID
+  estimates_temp <- subset(fss_learning_tempo, ID==x) #subset one ID at a time
+  temp_model <- lm(comp2 ~ session, data=estimates_temp)  #fit model for subsetted ID
+  counter = counter + 1 #counter iteration for indexing
+  estimates_slope[[counter]] <- coef(summary(temp_model))[2,1] #add values to estimates_slope list
+}
+estimates_slope <- as.data.frame(rbind(unlist(estimates_slope))) #make list into dataframe
+colnames(estimates_slope) <- c(1:18) #rename columns (from V1...V18 to 1...18)
+estimates_slope <- sort(estimates_slope, decreasing=T) #sort according to values
+part_levels <- as.integer(names(estimates_slope)) #turn into integer values
+fss_learning_tempo$ID <- factor(fss_learning_tempo$ID, levels=part_levels) #reorder ID factor levels in data according to sorted integers
+
+perc_comp_lmer1 <- lmer(comp2 ~ session + (1|ID), data=fss_learning_tempo)
+perc_comp_lmer2 <- lmer(comp2 ~ session + (session|ID), data=fss_learning_tempo)
+
+ggplot(fss_learning_tempo, aes(session, comp2)) + geom_point(alpha=.45) +
+  geom_line(aes(y=predict(perc_comp_lmer2), color="Random slope and intercept"), size=0.6) +
+  geom_line(aes(y=predict(perc_comp_lmer1), color="Random intercept"), size=0.6) +
+  labs(color=NULL) +
+  facet_wrap("ID") + ylab("Perceived competence") + xlab("Session") + theme_bw() +
+  theme(legend.position = c(x=.8, y=.1),
+        legend.background = element_rect(fill="white"),
+        legend.box.background = element_rect(colour = "black"),
+        legend.text = element_text(size=10),
+        axis.text.x = element_text(size=9),
+        panel.background = element_rect(fill = "white",
+                                        colour = "lightgrey",
+                                        size = 0.5, linetype = "solid"),
+        panel.border = element_blank(), 
+        panel.grid.major = element_line(size = 0.25, linetype = 'solid', colour = "grey"),
+        panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
+        strip.background=element_rect(fill="lightgray"))
+  
+ggsave("perceived_importance_session.pdf", width=7.5, height=6)
 
