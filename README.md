@@ -1,25 +1,23 @@
----
-output:
-  word_document: default
-  html_document: default
-  pdf_document: default
----
+# About Flowcar
 
-# About this README
-This document contains the instructions for rerunning the analysis pipeline for the paper "The Link Between Flow and Performance is Moderated by Task Experience"
+Repository for 2017 + 2019 experiments on Flow using Cogcarsim steering task.
 
-# Paper authors
+# Replication
+
+This section contains the instructions for rerunning the analysis pipeline for the paper "The Link Between Flow and Performance is Moderated by Task Experience"
+
+## Paper authors
 Jussi Palomäki, Tuisku Tammi, Noora Lehtonen, Niina Peltonen, Sami Abuhamdeh, Otto Lappi, Benjamin Ultan Cowley
 
-# Code authors
+## Code authors
 Jussi Palomäki, Tuisku Tammi, Benjamin Ultan Cowley
 
-# Instructions
+## Instructions
 
-## Setup
-Download all code files from this ...
+### One-shot Rmd
+Download all files from the [Figshare object here](https://doi.org/10.6084/m9.figshare.13567409), and follow the instructions there. Or:
 
-## Execute
+### R code
 There are two ways to run through the analysis pipeline:
 
 1) Navigate to Analyses/flowcar/R and open and run the Rmarkdown file "cogcarsim_analyses.Rmd". This file first (hiddenly) runs the code in the "combine_data.R", "znbnUtils.R" and "znbnVisuals.R" files ("combine.data.R" contains the code for wrangling and compiling the data for use in the analyses, while "znbnUtils.R" and "znbnVisuals.R" contain further necessary functions). Then, it (openly) runs the code in the "cogcarsim_analyses.R" file, which reproduces the analyses and figures of the main article as well as the Appendix. The "cogcarsim_analyses.Rmd" file can be "knitted" into an html file, which is already available in the R folder ("cogcarsim_analyses.html"). This html file can be opened and navigated in any up-to-date web browser, but the figures may have poorly defined aspect ratios (please confer the actual article for properly formatted figures).
