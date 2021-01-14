@@ -27,12 +27,12 @@ if (BIGDATA){
 
 
 ### BACKRGOUND DATA ----
-# TODO - TRANSLATE BACKGROUND DATASETS IN DATA FOLDER INTO ENGLISH, REMOVE EXCESS FIELDS
 # bkgd <-
 #   read.csv(file.path(indir, "background_2019.csv")) %>%
 #   mutate(ID = ID + 9) %>%
 #   rbind(read.csv(file.path(indir, "background_2017.csv")), .)
 # head(bkgd)
+background19 <- read.csv(file.path(indir, "background_2019.csv"))
 
 
 ### Behavioral (CogCarSim) data ----
@@ -81,7 +81,7 @@ game_data <- tbl_runs %>%
   mutate(participant = formatC(participant, width = 2, format = "d", flag = "0")) %>%
   group_by(participant) %>%
   # also log(duration) and log(cumrun) variables for plotting
-  mutate(cumrun = row_number(),
+  dplyr::mutate(cumrun = row_number(),
          ln.duration = log(duration),
          ln.cumrun = log(cumrun)) %>% 
   ungroup # remember to ungroup!
@@ -113,10 +113,10 @@ fss_items <- fss %>%
          flow = rowMeans(dplyr::select(., all_of(flow_items))),
          pi_total = rowMeans(dplyr::select(., all_of(pi_items)))) %>%
   # add also total perceived importance (mean)
-  rename(pi1 = Q11,
+  dplyr::rename(pi1 = Q11,
          pi2 = Q12,
          pi3 = Q13) %>%
-  rename(comp1 = A1,
+  dplyr::rename(comp1 = A1,
          comp2 = A2,
          comp3 = A3) %>% ##additional items on perceived competence! (line added 8.7.20)
   dplyr::select(participant:run, fluency, absorption, flow, pi1:pi3, comp1:comp3, pi_total) %>%
@@ -144,30 +144,30 @@ summary(fss_game)
 #     log(duration) ~ log(cumulative run)
 # to get slope and intercept coefficients
 fss_learning <- fss_game %>%
-  group_by(participant) %>%
+  dplyr::group_by(participant) %>%
   nest() %>% 
   # fit a linear model using log-log formula on durations and cumruns per participant
-  mutate(fit = map(data, ~lm(ln.duration ~ ln.cumrun, data = .)), # make models and...
-       coef = map(fit, tidy), # ...get coefficients and...
-       data_aug = map(fit, augment)) %>% #...get predictions
+  dplyr::mutate(fit = purrr::map(data, ~lm(ln.duration ~ ln.cumrun, data = .)), # make models and... (note: maps-library masks map() so I added purrr::)
+       coef = purrr::map(fit, tidy), # ...get coefficients and...
+       data_aug = purrr::map(fit, augment)) %>% #...get predictions
   unnest(coef) %>%
   # predicted curve slope and interception
   dplyr::select(participant, term, estimate, data_aug) %>%
   spread(term, estimate) %>%
-  rename(slope = ln.cumrun,
+  dplyr::rename(slope = ln.cumrun,
        intercept = `(Intercept)`) %>%
   unnest(data_aug) %>%
   ungroup %>%
   # join new ones to fss_game -> fss_learning
   dplyr::select(participant:.fitted, intercept, slope) %>%
-  rename(learning_curve = .fitted) %>%
+  dplyr::rename(learning_curve = .fitted) %>%
   left_join(fss_game, by = c('participant', 'ln.duration', 'ln.cumrun')) %>%
   dplyr::select(participant, session, run, everything()) %>%
   # acquire  deviation from predicted curve
-  mutate(deviation = ln.duration - learning_curve) %>%
+  dplyr::mutate(deviation = ln.duration - learning_curve) %>%
   group_by(participant) %>%
   # acquire flow z-scores
-  mutate(z.flow = ((flow-mean(flow)) / sd(flow))) %>%
+  dplyr::mutate(z.flow = ((flow-mean(flow)) / sd(flow))) %>%
   ungroup()
 
 # spit out newly created data
