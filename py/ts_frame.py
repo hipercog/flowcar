@@ -6,7 +6,8 @@ import sys
 #ohjeita: tarkista, etta tama tiedosto ja ts_session_6.csv ovat samassa kansiossa (Downloads)
 #Downloads-kansiossa klikkaa oikealla, run in terminal -> 'python ts_frame.py'
 #framet tallentuu uuteen frames_session_6.csv-tiedostoon 4. sarakkeeseen
-#timestampit on 3-minuuttisten alkuaikoja. jos tarvitaan loppumisaikojen framet, tulee ts_session_6.csv-tiedoston timestamp-kohtiin lisata +240
+#timestampit on 3-minuuttisten alkuaikoja. jos tarvitaan loppumisaikojen framet, 
+# tulee ts_session_6.csv-tiedoston timestamp-kohtiin lisata +240
 #muista tarkistaa myös Transcendin kansiopolku (rec_dir)
 
 rec_dir = "/media/tru/Transcend/FLOW/participant_data/"

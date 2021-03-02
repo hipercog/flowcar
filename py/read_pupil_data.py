@@ -19,7 +19,7 @@ gaze_norm = [[g['base_data'][0]['unix_ts'] - timebase, g['norm_pos'][0], g['norm
 gaze_norm = np.array(gaze_norm)
 np.savetxt("data.csv", gaze_norm, delimiter = ",")
 
-print len(gaze_norm[:,0])
+print(len(gaze_norm[:,0]))
 
 data = genfromtxt("/home/tru/pupil/recordings/2017_10_20/000/step.csv", delimiter=",", skip_header = 1)
 
@@ -34,7 +34,7 @@ f = scipy.interpolate.interp1d(gaze_norm[:,0], gaze_norm[:,1], kind = 1)
 
 final_signal = f(cogcarsimdata[:,2])
 
-print len(cogcarsimdata[:,0])
+print(len(cogcarsimdata[:,0]))
 
 fig, (ax1, ax2) = plt.subplots(1, 2)
 

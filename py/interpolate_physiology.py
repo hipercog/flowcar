@@ -1,13 +1,12 @@
-import glob
+#import glob
+#import sys
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
 import json
 import os
-import sys
 from numpy import genfromtxt
 import scipy.interpolate
-import csv
 
 frames = open("/home/tru/pupil_interpolation/Frames.csv")
 frames = list(csv.reader(frames))
@@ -20,7 +19,7 @@ frame = int(frames[row-1][1])
 current_run = int(frames[row-1][2])  
 
 print('index: ' + id + "-" + session_run)
-print 'frame: ' + str(frame)
+print('frame: ' + str(frame))
 print('run: ' + str(current_run))
 
 rec_dir = "/home/tru/pupil_interpolation/" + id
@@ -47,7 +46,7 @@ for line in open(os.path.join(rec_dir, id + "-" + session_run +".jsons")):
     bvp.append([hdr['ts'], o['F']])
 
 ts, bvp = np.array(bvp).T
-print ts
+print(ts)
 ts -= timebase
 
 
@@ -57,7 +56,7 @@ cogcarsimdata = np.array(data)
 #for this run:
 rundata = cogcarsimdata[np.where(cogcarsimdata[:,0]==current_run),1].ravel()
 rundata -= rundata[0]
-print "length of run: " + str(rundata[len(rundata)-1])
+print("length of run: " + str(rundata[len(rundata)-1]))
 
 
 #interpolate EDA
