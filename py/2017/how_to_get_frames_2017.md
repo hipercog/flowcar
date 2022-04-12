@@ -16,13 +16,8 @@ __Searching for frames in pupil__:
 5. frame is the number next to the play/pause button
 6. write down run (e.g. 01-1-1), frame number, and pupil file
 
-
 The resulting Frames.csv file was used in the interpolate\_physiology.py script to set trial start times (unix timestamps) for physiology data. The physiology data was then interpolated to match cogcarsim timestamps.
 
- 
-
-The script requires a bit of "manual work" (i.e. does not loop over trials), due to our limited programming skills at the time, and the  need for checking each recording individually anyway. It is assumed that there is one recording file per trial (and that files are named after the trials: 01-1-1.jsons, and so on) but that was always not the case, so it might cause an error. However it should be seen from filenames (e.g. participant 5 session 5 had all trials in one recording if I remember correctly).
-
- 
+The script requires a bit of "manual work" (i.e. does not loop over trials), due to our limited programming skills at the time, and the  need for checking each recording individually anyway. It is assumed that there is one recording file per trial (and that files are named after the trials: 01-1-1.jsons, and so on) but that was always not the case, so it might cause an error. However it should be seen from filenames (e.g. participant 5 session 5 had all trials in one recording if I remember correctly). 
 
 Also, some recordings had missing end/start segments so they had to be handled differently. physiology\_notes.ods has the missing trial/segment info.  

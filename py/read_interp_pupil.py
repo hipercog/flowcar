@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun 19 21:34:44 2020
+Created on Tue Apr  5 16:27:26 2022
 
 @author: bcowley
 """
 
-import os, math, json, csv, sys
+import os, json, csv, sys
 import numpy as np
+import pandas as pd
 import logging as lg
 import datetime as dt
 import matplotlib.pyplot as plt
@@ -45,43 +46,45 @@ def getCogCarSimData(inp):
 basepath = '/media/bcowley/Transcend/flowcar-backup/cogcarsim_physio_2019'
 read_dir = 'ccs_recordings'
 rite_dir = 'sync_physio2ccs'
-sigmap = {'EDA':'E', 'EOG':['A', 'B'], 'BVP':'F'}
-mapsig = {'E':'EDA', 'A':'EOG', 'B':'EOG', 'F':'BVP'}
-siglist = ['EDA', 'BVP', 'EOG']
+siglist = ['confidence', 'norm_pos_x', 'norm_pos_y', 'diameter']
+sigix = [0, 1, 2, 3]
 if "frames" not in globals() and "BLTs" not in globals():
     frames, BLTs = getframes(basepath)
 if "CCSrun" not in globals() and "CCSstp" not in globals():
     CCSrun, CCSstp = getCogCarSimData(basepath)
 
 
-# Get signal out of JSON file
-def getsig(nexusfile, chans = ['A', 'B', 'E', 'F']):
-    nxdata = []
-    #    create default data in case there are reading problems
-    nx_ts_i = {'ts':math.nan}
-    nx_sg_i = dict((k,math.nan) for k in chans)
-    with open(nexusfile) as f:
-        i = 0
-        for line in f:
-            i += 1
-            try:
-                json_object = json.loads(line)
-                nx_ts_i = json_object[0]
-                nx_sg_i = json_object[1]
-            except:
-                lg.exception("JSON read error line{}: {}".format(str(i), line))
-            else:
-                fields = [nx_ts_i[1]]
-                for c in chans:
-                    fields.append(nx_sg_i[c])
-                nxdata.append(fields)
-            
-        f.close()
-        
-    nxarr = np.array(nxdata).T
-    idx = np.divide([len(np.unique(r)) * 100 for r in nxarr], len(nxarr.T)) > 5
-        
-    return np.array(chans)[idx[1:]], nxarr[idx,:]
+
+## Get signal out of JSON file
+#def getsig(ppl_pos_file, chans):
+#    ppldata = []
+#    
+#    #    create default data in case there are reading problems
+#    ppl_ts_i = {'ts':math.nan}
+#    ppl_sg_i = dict((k,math.nan) for k in chans)
+#    
+#    with open(ppl_pos_file, newline='') as f:
+#        i = 0
+#        ppl_rdr = csv.reader(f, delimiter=',', quoting=csv.QUOTE_NONNUMERIC)
+#        for line in ppl_rdr:
+#            i += 1
+#            try:
+#                ppl_ts_i = line[0]
+#                ppl_sg_i = line[1]
+#            except:
+#                lg.exception("csv read error line{}: {}".format(str(i), line))
+#            else:
+#                fields = [ppl_ts_i[1]]
+#                for c in chans:
+#                    fields.append(ppl_sg_i[c])
+#                ppldata.append(fields)
+#            
+#        f.close()
+#        
+#    pplarr = np.array(ppldata).T
+#    idx = np.divide([len(np.unique(r)) * 100 for r in pplarr], len(pplarr.T)) > 5
+#        
+#    return np.array(chans)[idx[1:]], pplarr[idx,:]
 
 
 # Get Pupil session info
@@ -131,13 +134,13 @@ def sanity_check(svpath, signame, t1, d1, t2, d2):
 # parse data path for subject, session, run indices
 def get_sbj_ssn(datpth):
     
-    pfx = os.sep + 'Nexus_data' + os.sep + 'session_'
+    pfx = os.sep + 'Pupil_data' + os.sep + 'session_'
     if datpth.find(pfx) == -1:
-        pfx = os.sep + 'Pupil_data' + os.sep + 'session_'
+        pfx = os.sep + 'Nexus_data' + os.sep + 'session_'
         
     pfx = datpth.find(pfx) + len(pfx)
     sbj = datpth[pfx:pfx + 2]
-    ssn = datpth[pfx + 3:]
+    ssn = datpth[pfx + 3:pfx + 5]
     
     lg.info('Subject: ' + sbj)
     lg.info('Session: ' + ssn)
@@ -145,22 +148,19 @@ def get_sbj_ssn(datpth):
     return sbj, ssn
 
 
-# Function parses given nexus file, 
-def parse_nxs(inp, fnm, sigs):
+# Function parses given pupil_positions file, 
+def parse_ppl(inp, fnm, sigs):
     
     # Get world time stamp data from pupil folder
-    pupilpath = os.path.join(inp.replace('Nexus', 'Pupil'), '000')
+    pupilpath = inp.replace(os.path.join('exports', '000'), '')
     world_times = np.load(os.path.join(pupilpath, "world_timestamps.npy"))
-    world_times += getpupilsystime(os.path.join(pupilpath, "info.player.json"))
+    pupilpath = os.path.join(inp, fnm)
 
-    # get the signal and timestamp data    
-    chx = []
-    for k, v in sigmap.items():
-        if k in sigs:
-            [chx.append(c) for c in v]
-
-    hdr, dat = getsig(os.path.join(inp, fnm), chx)
-    ts = dat[0,:]
+    # get the signal and timestamp data
+    ppldata = pd.read_csv(pupilpath)
+    hdr = np.array([siglist[i] for i in sigs])
+    dat = ppldata.loc[:,np.isin(ppldata.columns, hdr)].to_numpy().T
+    ts = ppldata.iloc[:,0].to_numpy().T
     
     sbj, ssn = get_sbj_ssn(inp)
 
@@ -176,9 +176,6 @@ def parse_nxs(inp, fnm, sigs):
         t2 = np.argmin(abs(ts - world_times[frblt[1]]))
         bldat = dat[:, t1:t2]
         bldat[0, :] -= bldat[0, 0] # zero the timestamps
-
-    # Split time and data to make interpolation of the trials readable
-    dat = np.delete(dat, 0, 0)
     
     # Get correct frame/timebase for this subject, session, & run
     frssn = [len(world_times) - 1]
@@ -219,7 +216,7 @@ def parse_nxs(inp, fnm, sigs):
 
         # extract the right physio data, and interp based on cogcarsim
         for chx in range(len(hdr)):
-            lg.info("Extracting {}".format(mapsig[hdr[chx]]))
+            lg.info("Extracting {}".format(hdr[chx]))
             #interpolate biosig & get final signal with cogcarsim timestamps
             interper = spi.interp1d(fi_ts, fi_dat[chx,:], kind = 1)
             try:
@@ -229,9 +226,10 @@ def parse_nxs(inp, fnm, sigs):
             else:
                 # plot comparison of pre- to post-interp
                 sanity_check(
-                        os.path.join(inp.replace(read_dir, rite_dir)
-                        , 'figs', 'trial{}'.format(trls[i]))
-                        , mapsig[hdr[chx]]
+                        os.path.join(inp.replace(read_dir, rite_dir).replace(
+                                os.path.join('000', 'exports', '000'), '')
+                                , 'figs', 'trial{}'.format(trls[i]))
+                        , hdr[chx]
                         , fi_ts, fi_dat[chx,:]
                         , runTS, framei[chx + 1])
 
@@ -242,43 +240,57 @@ def parse_nxs(inp, fnm, sigs):
     
     return hdr, trls, outdat, bldat, sbj, ssn
 
+def get_pupil_timestamp(inpath):
+    inp = inpath.replace('Pupil', 'Nexus').replace(
+                        os.path.join('000', 'exports', '000'), '')
+    for rt, sb, fyles in os.walk(inp):
+        for fy in fyles:
+            if fy.startswith('pupil_info_'):
+                ts = dt.datetime.fromtimestamp(
+                    float(fy[fy.find('o_') + 2:fy.find('.txt')]))
+                return ts
 
-# Function walks through folders under given path & processes any nexus files
-def traversi(indir, sigs = ['EDA', 'BVP', 'EOG']):
-    indir = os.path.abspath(indir)
+
+# Function walks through folders under given path & processes any pupil files
+def traversi(inpath, sigs):
+    inpath = os.path.abspath(inpath)
     
-    for root, subdirs, files in os.walk(indir):
-        
-        outdir = root.replace(read_dir, rite_dir)
-        
+    for root, subdirs, files in os.walk(inpath):
+                
         for f in files:
-            if f.startswith('nexus') & f.endswith('.txt'):
+            if f == 'pupil_positions.csv':
+                outdir = root.replace(os.path.join('000', 'exports', '000'), ''
+                                    ).replace(read_dir, rite_dir)
+                ts = get_pupil_timestamp(root)
+                if ts is None:
+                    print('No timestamp in {}'.format(root))
                 
                 # Extract timestamps and correct columns
+#                FIXME ADD TIMESTAMPS TO OUTPUT SO INDIVIDUAL CHANNEL FILES CAN HAVE
                 try:
-                    hdr, trl, dat, bl, sbj, ssn = parse_nxs(root, f, sigs)
+                    hdr, trl, dat, bl, sbj, ssn = parse_ppl(root, f, sigs)
+                    if dat == []:
+                        continue
                 except:
                     lg.exception("parse_pupil error!")
                     continue
 
                 # Manage file writing paths etc
-                lg.info('Read {} from\n {}'.format(sigs, os.path.join(root, f)))
+                lg.info('Read {} from\n{}'.format(hdr, os.path.join(root, f)))
                 if not os.path.exists(outdir):
                     os.makedirs(outdir, exist_ok = True)
-                lg.info('Write to\n {}'.format(outdir))
-                ts = dt.datetime.fromtimestamp(
-                        float(f[f.find('_') + 1:f.find('.txt')]))
+                lg.info('Write to\n{}'.format(outdir))
                 
                 # Write out the Baseline
                 if bl != []:
                     for ch in hdr:
-                        nm = '{}_{}_baseline_Nexus{}_{}.csv'.format(sbj, ssn,
-                                mapsig[ch], ts.strftime('%Y%m%d'))
+                        nm = '{}_{}_baseline_Pupil{}_{}.csv'.format(sbj, ssn,
+                                ch, ts.strftime('%Y%m%d'))
                         outf = os.path.join(outdir, nm)
                         outf = open(outf, "w", newline="")
                         writer = csv.writer(outf)
-                        fi_ch_bl = bl[[True] + list(hdr==ch), :]
-                        writer.writerows(fi_ch_bl.T)                    
+                        fi_ch_bl = bl[np.isin(hdr, ch), :]
+                        writer.writerows(fi_ch_bl.T)
 
                 # Write out the data
                 for i in range(len(trl)):
@@ -286,17 +298,18 @@ def traversi(indir, sigs = ['EDA', 'BVP', 'EOG']):
                         continue
                     fi_dat = dat[i]
                     for ch in hdr:
-                        nm = '{}_{}_trial{}_Nexus{}_{}.csv'.format(sbj, ssn, 
-                              trl[i], mapsig[ch], ts.strftime('%Y%m%d'))
+                        nm = '{}_{}_trial{}_Pupil{}_{}.csv'.format(sbj, ssn, 
+                              trl[i], ch, ts.strftime('%Y%m%d'))
                         outf = os.path.join(outdir, nm)
                         outf = open(outf, "w", newline="")
                         writer = csv.writer(outf)
-                        fi_ch_dat = fi_dat[[True] + list(hdr==ch), :]
+                        fi_ch_dat = fi_dat[[True] + list(np.isin(hdr, ch)), :]
                         writer.writerows(fi_ch_dat.T)
+#                f = [] # Clear f because it might be the last file
 
         if subdirs != []:
             for sbdr in subdirs:
-                nu_ind = os.path.join(indir, sbdr)
+                nu_ind = os.path.join(root, sbdr)
                 if os.path.exists(nu_ind):
                     lg.info('Going deeper into {}'.format(nu_ind))
                     traversi(nu_ind, sigs)
@@ -304,7 +317,7 @@ def traversi(indir, sigs = ['EDA', 'BVP', 'EOG']):
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        siglist = sys.argv[1]
+        sigix = sys.argv[1]
         if len(sys.argv) > 2:
             basepath = sys.argv[2]
             rite_dir = os.path.join(basepath, sys.argv[0])
@@ -320,10 +333,10 @@ lg.basicConfig(filename=os.path.join(basepath, read_dir, 'read_interp_pupil.log'
                level=lg.DEBUG)
 
 #DEBUG
-DEBUG = False
+DEBUG = True
 if DEBUG:
-    one_ssn = '01/'
+    one_ssn = '09/'
 #    one_ssn = '09/Pupil_data/session_09-01/000/exports/000'
-    traversi(os.path.join(basepath, read_dir, one_ssn), siglist)
+    traversi(os.path.join(basepath, read_dir, one_ssn), sigix)
 else:
-    traversi(os.path.join(basepath, read_dir), siglist)
+    traversi(os.path.join(basepath, read_dir), sigix)
